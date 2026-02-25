@@ -3,6 +3,7 @@ import "react-native-gesture-handler";
 import { useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -29,6 +30,7 @@ const getStatusBarStyle = (background: string): "light" | "dark" => {
 
 export default function RootLayout() {
   const theme = useAppTheme();
+  const isIOS = Platform.OS === "ios";
 
   useEffect(() => {
     void initializeNotificationChannel();
@@ -44,6 +46,22 @@ export default function RootLayout() {
             options={{
               headerShown: false,
               headerTitle: "",
+            }}
+          />
+          <Stack.Screen
+            name="latmiyat-player"
+            options={{
+              headerShown: false,
+              presentation: isIOS ? "formSheet" : "modal",
+              animation: isIOS ? "default" : "slide_from_bottom",
+              sheetAllowedDetents: isIOS ? [0.5] : undefined,
+              sheetInitialDetentIndex: isIOS ? 0 : undefined,
+              sheetGrabberVisible: isIOS,
+              sheetExpandsWhenScrolledToEdge: false,
+              sheetCornerRadius: isIOS ? 34 : undefined,
+              contentStyle: {
+                backgroundColor: isIOS ? "transparent" : theme.colors.background,
+              },
             }}
           />
           <Stack.Screen

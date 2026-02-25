@@ -5,22 +5,23 @@ import {
   type AudioStatus,
 } from "expo-audio";
 
-import { pauseLatmiyatPlayback } from "./latmiyatPlayerService";
 import { useAppStore } from "../store/appStore";
 
-interface QuranTrackMeta {
+interface LatmiyatTrackMeta {
   sourceUrl: string;
-  surahNumber: number;
-  surahName: string;
-  totalAyahs: number;
+  trackId: string;
+  title: string;
+  artistName: string;
+  artworkUrl?: string | null;
+  trackUrl?: string | null;
 }
 
 let sharedPlayer: ExpoAudioPlayer | null = null;
 let sharedSourceUrl: string | null = null;
 let statusSubscription: { remove: () => void } | null = null;
 
-const updateState = (patch: Partial<ReturnType<typeof useAppStore.getState>["quranPlayer"]>) => {
-  useAppStore.getState().setQuranPlayerState(patch);
+const updateState = (patch: Partial<ReturnType<typeof useAppStore.getState>["latmiyatPlayer"]>) => {
+  useAppStore.getState().setLatmiyatPlayerState(patch);
 };
 
 const configureAudioMode = async () => {
@@ -68,23 +69,24 @@ const teardownPlayer = () => {
   sharedSourceUrl = null;
 };
 
-const applyTrackMeta = (meta: QuranTrackMeta) => {
+const applyTrackMeta = (meta: LatmiyatTrackMeta) => {
   updateState({
     sourceUrl: meta.sourceUrl,
-    surahNumber: meta.surahNumber,
-    surahName: meta.surahName,
-    totalAyahs: meta.totalAyahs,
+    trackId: meta.trackId,
+    title: meta.title,
+    artistName: meta.artistName,
+    artworkUrl: meta.artworkUrl ?? null,
+    trackUrl: meta.trackUrl ?? null,
     error: null,
   });
 };
 
-export const ensureQuranPlayback = async (opts: {
-  track: QuranTrackMeta;
+export const ensureLatmiyatPlayback = async (opts: {
+  track: LatmiyatTrackMeta;
   startMillis?: number;
   shouldPlay?: boolean;
 }) => {
   const { track, startMillis, shouldPlay } = opts;
-  pauseLatmiyatPlayback();
   await configureAudioMode();
   applyTrackMeta(track);
 
@@ -130,7 +132,18 @@ export const ensureQuranPlayback = async (opts: {
   return nextPlayer;
 };
 
-export const seekQuranToMillis = async (millis: number, shouldPlay?: boolean) => {
+export const toggleLatmiyatPlayback = async () => {
+  if (!sharedPlayer || !sharedPlayer.isLoaded) return;
+  if (sharedPlayer.playing) {
+    sharedPlayer.pause();
+    updateState({ isPlaying: false });
+  } else {
+    sharedPlayer.play();
+    updateState({ isPlaying: true });
+  }
+};
+
+export const seekLatmiyatToMillis = async (millis: number, shouldPlay?: boolean) => {
   if (!sharedPlayer || !sharedPlayer.isLoaded) return;
   const safeMillis = Math.max(0, millis);
   updateState({ isLoading: true, error: null });
@@ -154,32 +167,16 @@ export const seekQuranToMillis = async (millis: number, shouldPlay?: boolean) =>
   }
 };
 
-export const toggleQuranPlayback = async () => {
-  if (!sharedPlayer || !sharedPlayer.isLoaded) return;
-  if (sharedPlayer.playing) {
-    sharedPlayer.pause();
-    updateState({ isPlaying: false });
-  } else {
-    sharedPlayer.play();
-    updateState({ isPlaying: true });
-  }
-};
-
-export const pauseQuranPlayback = () => {
+export const pauseLatmiyatPlayback = () => {
   if (!sharedPlayer || !sharedPlayer.isLoaded) return;
   sharedPlayer.pause();
   updateState({ isPlaying: false });
 };
 
-export const resumeQuranPlayback = () => {
-  if (!sharedPlayer || !sharedPlayer.isLoaded) return;
-  sharedPlayer.play();
-  updateState({ isPlaying: true });
+export const stopLatmiyatPlayback = () => {
+  teardownPlayer();
+  useAppStore.getState().resetLatmiyatPlayer();
 };
 
-export const setQuranCurrentAyah = (ayahNumber: number | null) => {
-  updateState({ currentAyah: ayahNumber });
-};
-
-export const isQuranTrackActive = (sourceUrl?: string | null) =>
+export const isLatmiyatTrackActive = (sourceUrl?: string | null) =>
   !!sourceUrl && sourceUrl === sharedSourceUrl && !!sharedPlayer && sharedPlayer.isLoaded;

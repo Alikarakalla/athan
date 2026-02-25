@@ -1,6 +1,6 @@
 export interface LatmiyatTrack {
   id: string;
-  trackId: number;
+  trackId: string;
   title: string;
   artistName: string;
   albumName: string;
@@ -10,4 +10,3 @@ export interface LatmiyatTrack {
   releaseDate: string | null;
   durationMillis: number;
 }
-

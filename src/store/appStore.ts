@@ -30,12 +30,40 @@ export interface QuranPlayerState {
   error: string | null;
 }
 
+export interface LatmiyatPlayerState {
+  sourceUrl: string | null;
+  trackId: string | null;
+  title: string;
+  artistName: string;
+  artworkUrl: string | null;
+  trackUrl: string | null;
+  isLoading: boolean;
+  isPlaying: boolean;
+  positionMillis: number;
+  durationMillis: number;
+  error: string | null;
+}
+
 const INITIAL_QURAN_PLAYER_STATE: QuranPlayerState = {
   sourceUrl: null,
   surahNumber: null,
   surahName: "",
   totalAyahs: 0,
   currentAyah: null,
+  isLoading: false,
+  isPlaying: false,
+  positionMillis: 0,
+  durationMillis: 0,
+  error: null,
+};
+
+const INITIAL_LATMIYAT_PLAYER_STATE: LatmiyatPlayerState = {
+  sourceUrl: null,
+  trackId: null,
+  title: "",
+  artistName: "",
+  artworkUrl: null,
+  trackUrl: null,
   isLoading: false,
   isPlaying: false,
   positionMillis: 0,
@@ -62,6 +90,7 @@ interface AppState {
   bookmarks: QuranBookmark[];
   lastRead: LastReadPosition | null;
   quranPlayer: QuranPlayerState;
+  latmiyatPlayer: LatmiyatPlayerState;
   setThemeMode: (mode: ThemeMode) => void;
   setThemeColor: (targetMode: "light" | "dark", key: ThemeColorKey, value: string) => void;
   resetThemeCms: (targetMode?: "light" | "dark") => void;
@@ -83,6 +112,8 @@ interface AppState {
   setLastRead: (lastRead: LastReadPosition) => void;
   setQuranPlayerState: (patch: Partial<QuranPlayerState>) => void;
   resetQuranPlayer: () => void;
+  setLatmiyatPlayerState: (patch: Partial<LatmiyatPlayerState>) => void;
+  resetLatmiyatPlayer: () => void;
   clearCachedContentState: () => void;
 }
 
@@ -107,6 +138,7 @@ export const useAppStore = create<AppState>()(
       bookmarks: [],
       lastRead: null,
       quranPlayer: INITIAL_QURAN_PLAYER_STATE,
+      latmiyatPlayer: INITIAL_LATMIYAT_PLAYER_STATE,
 
       setThemeMode: () => set({ themeMode: "light" }),
       setThemeColor: (targetMode, key, value) =>
@@ -176,6 +208,14 @@ export const useAppStore = create<AppState>()(
           },
         })),
       resetQuranPlayer: () => set({ quranPlayer: INITIAL_QURAN_PLAYER_STATE }),
+      setLatmiyatPlayerState: (patch) =>
+        set((state) => ({
+          latmiyatPlayer: {
+            ...state.latmiyatPlayer,
+            ...patch,
+          },
+        })),
+      resetLatmiyatPlayer: () => set({ latmiyatPlayer: INITIAL_LATMIYAT_PLAYER_STATE }),
 
       clearCachedContentState: () =>
         set({

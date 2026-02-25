@@ -3,6 +3,7 @@ import { Tabs } from "expo-router";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { Platform } from "react-native";
 
+import { LatmiyatBottomAccessory } from "../../src/components/LatmiyatBottomAccessory";
 import { QuranBottomAccessory } from "../../src/components/QuranBottomAccessory";
 import { useI18n } from "../../src/hooks/useI18n";
 import { useAppTheme } from "../../src/hooks/useAppTheme";
@@ -20,8 +21,11 @@ export default function TabsLayout() {
   const theme = useAppTheme();
   const { t } = useI18n();
   const quranPlayer = useAppStore((s) => s.quranPlayer);
+  const latmiyatPlayer = useAppStore((s) => s.latmiyatPlayer);
   const useNativeTabs = Platform.OS === "ios" && getIOSMajorVersion() >= 26;
-  const showBottomAccessory = quranPlayer.isLoading || quranPlayer.isPlaying;
+  const showQuranAccessory = !!quranPlayer.sourceUrl && (quranPlayer.isLoading || quranPlayer.isPlaying);
+  const showLatmiyatAccessory =
+    !!latmiyatPlayer.sourceUrl && (latmiyatPlayer.isLoading || latmiyatPlayer.isPlaying);
 
   if (useNativeTabs) {
     return (
@@ -37,9 +41,9 @@ export default function TabsLayout() {
           selected: { color: theme.colors.primary },
         }}
       >
-        {showBottomAccessory ? (
+        {showLatmiyatAccessory || showQuranAccessory ? (
           <NativeTabs.BottomAccessory>
-            <QuranBottomAccessory />
+            {showLatmiyatAccessory ? <LatmiyatBottomAccessory /> : <QuranBottomAccessory />}
           </NativeTabs.BottomAccessory>
         ) : null}
 
@@ -53,9 +57,9 @@ export default function TabsLayout() {
           <NativeTabs.Trigger.Icon sf={{ default: "book.closed", selected: "book.closed.fill" }} />
         </NativeTabs.Trigger>
 
-        <NativeTabs.Trigger name="bookmarks">
-          <NativeTabs.Trigger.Label>{t("tabs.bookmarks")}</NativeTabs.Trigger.Label>
-          <NativeTabs.Trigger.Icon sf={{ default: "bookmark", selected: "bookmark.fill" }} />
+        <NativeTabs.Trigger name="latmiyat">
+          <NativeTabs.Trigger.Label>{t("tabs.latmiyat")}</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon sf={{ default: "music.note", selected: "music.note" }} />
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="calendar">
@@ -101,13 +105,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="bookmarks"
-        options={{
-          title: t("tabs.bookmarks"),
-          tabBarIcon: ({ color }) => <MaterialIcons name="bookmark" size={24} color={color} />,
-        }}
-      />
-      <Tabs.Screen
         name="calendar"
         options={{
           title: t("home.calendar"),
@@ -115,10 +112,23 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="latmiyat"
+        options={{
+          title: t("tabs.latmiyat"),
+          tabBarIcon: ({ color }) => <MaterialIcons name="library-music" size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: t("tabs.settings"),
           tabBarIcon: ({ color }) => <MaterialIcons name="settings" size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="bookmarks"
+        options={{
+          href: null,
         }}
       />
     </Tabs>

@@ -257,6 +257,19 @@ export const QuranListScreen = () => {
           >
             <MaterialIcons name="filter-list" size={22} color={palette.textSecondary} />
           </Pressable>
+
+          <Pressable
+            onPress={() => router.push("/bookmarks")}
+            style={[
+              styles.filterButton,
+              {
+                backgroundColor: palette.surface,
+                borderColor: palette.border,
+              },
+            ]}
+          >
+            <MaterialIcons name="bookmark-border" size={22} color={palette.textSecondary} />
+          </Pressable>
         </View>
       ) : null}
 
@@ -327,6 +340,10 @@ export const QuranListScreen = () => {
           />
 
           <Stack.Toolbar placement="right">
+            <Stack.Toolbar.Button
+              icon="bookmark"
+              onPress={() => router.push("/bookmarks")}
+            />
             {renderFilterMenu()}
           </Stack.Toolbar>
         </>

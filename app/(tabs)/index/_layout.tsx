@@ -58,7 +58,7 @@ export default function HomeStackLayout() {
                     : `${headerMeta.locationName} - ${headerMeta.timeLabel}`
                 }
                 titleColor={theme.colors.primary}
-                pillBackgroundColor={theme.colors.card}
+                pillBackgroundColor="transparent"
                 pillBorderColor={theme.colors.border}
                 items={[
                   {
