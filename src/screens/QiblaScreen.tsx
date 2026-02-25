@@ -17,37 +17,38 @@ import { useAppStore } from "../store/appStore";
 import type { Coordinates } from "../types/prayer";
 import { calculateQiblaBearing, normalizeDegrees, relativeQiblaAngle } from "../utils/qibla";
 
-const QIBLA_UI = {
-  light: {
-    bg: "#f4efe6",
-    panel: "#fffaf0",
-    ring: "#f7f0e4",
-    ringBorder: "#dccfb9",
-    text: "#2a2118",
-    muted: "#776a58",
-    primary: "#B08968",
-    primaryDark: "#2F241A",
-    accent: "#8B6A46",
-    grid: "rgba(139,106,70,0.08)",
-  },
-  dark: {
-    bg: "#1A1511",
-    panel: "#241C15",
-    ring: "#2E241B",
-    ringBorder: "rgba(255,255,255,0.08)",
-    text: "#f8fafc",
-    muted: "#bba98f",
-    primary: "#D0B089",
-    primaryDark: "#2F241A",
-    accent: "#D6B489",
-    grid: "rgba(176,137,104,0.08)",
-  },
-} as const;
+const hexToRgba = (hex: string, alpha: number) => {
+  const clampedAlpha = Math.max(0, Math.min(1, alpha));
+  const clean = hex.replace("#", "").trim();
+  if (!/^[0-9a-fA-F]{6}$/.test(clean)) {
+    return `rgba(0,0,0,${clampedAlpha})`;
+  }
+  const value = Number.parseInt(clean, 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return `rgba(${r},${g},${b},${clampedAlpha})`;
+};
 
 export const QiblaScreen = () => {
   const theme = useAppTheme();
   const { t } = useI18n();
-  const palette = theme.mode === "dark" ? QIBLA_UI.dark : QIBLA_UI.light;
+  const palette = useMemo(
+    () => ({
+      bg: theme.colors.background,
+      panel: theme.colors.card,
+      ring: theme.colors.backgroundAlt,
+      ringBorder: theme.colors.border,
+      text: theme.colors.text,
+      muted: theme.colors.textMuted,
+      primary: theme.colors.primary,
+      primaryDark: theme.colors.background,
+      accent: theme.colors.accent,
+      grid: hexToRgba(theme.colors.primary, 0.08),
+      danger: theme.colors.danger,
+    }),
+    [theme.colors],
+  );
   const savedCoords = useAppStore((s) => s.coordinates);
   const setCoordinates = useAppStore((s) => s.setCoordinates);
   const setLocationPermission = useAppStore((s) => s.setLocationPermission);
@@ -348,8 +349,8 @@ export const QiblaScreen = () => {
                   style={[
                     styles.alignmentBadge,
                     {
-                      backgroundColor: isAligned ? "rgba(176,137,104,0.16)" : "transparent",
-                      borderColor: isAligned ? "rgba(176,137,104,0.3)" : palette.ringBorder,
+                      backgroundColor: isAligned ? hexToRgba(palette.primary, 0.16) : "transparent",
+                      borderColor: isAligned ? hexToRgba(palette.primary, 0.3) : palette.ringBorder,
                     },
                   ]}
                 >
@@ -387,7 +388,7 @@ export const QiblaScreen = () => {
                   {t("qibla.gps", { lat: coords.latitude.toFixed(5), lng: coords.longitude.toFixed(5) })}
                 </Text>
               ) : null}
-              {error ? <Text style={[styles.coordsText, { color: "#ef4444" }]}>{error}</Text> : null}
+              {error ? <Text style={[styles.coordsText, { color: palette.danger }]}>{error}</Text> : null}
             </View>
           </>
         )}

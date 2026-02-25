@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   FlatList,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -10,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { Stack, router } from "expo-router";
 
 import { fetchSurahList, getCachedSurahList } from "../api/quranApi";
 import { useI18n } from "../hooks/useI18n";
@@ -18,48 +19,74 @@ import { useAppTheme } from "../hooks/useAppTheme";
 import { useAppStore } from "../store/appStore";
 import type { SurahSummary } from "../types/quran";
 
-const QURAN_THEME = {
-  light: {
-    bg: "#f4efe6",
-    card: "#fffaf0",
-    surface: "#fffaf0",
-    hover: "rgba(255,255,255,0.5)",
-    border: "#d8cfbf",
-    rowBorder: "#eee4d2",
-    text: "#2a2118",
-    textSecondary: "#776a58",
-    textAccentMuted: "#b79f82",
-    primary: "#B08968",
-    primaryDark: "#2F241A",
-    darkSurface: "#3A2D22",
-  },
-  dark: {
-    bg: "#1A1511",
-    card: "#2E241B",
-    surface: "#2E241B",
-    hover: "rgba(46,36,27,0.5)",
-    border: "rgba(255,255,255,0.06)",
-    rowBorder: "rgba(255,255,255,0.04)",
-    text: "#ffffff",
-    textSecondary: "#cbd5e1",
-    textAccentMuted: "#C7AF8A",
-    primary: "#D0B089",
-    primaryDark: "#2F241A",
-    darkSurface: "#3A2D22",
-  },
-} as const;
+const hexToRgba = (hex: string, alpha: number) => {
+  const clampedAlpha = Math.max(0, Math.min(1, alpha));
+  const clean = hex.replace("#", "").trim();
+  if (!/^[0-9a-fA-F]{6}$/.test(clean)) {
+    return `rgba(0,0,0,${clampedAlpha})`;
+  }
+  const value = Number.parseInt(clean, 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return `rgba(${r},${g},${b},${clampedAlpha})`;
+};
+
+type SortBy = "number" | "name" | "ayahs";
+type SortDirection = "asc" | "desc";
 
 export const QuranListScreen = () => {
   const theme = useAppTheme();
-  const { t } = useI18n();
-  const palette = theme.mode === "dark" ? QURAN_THEME.dark : QURAN_THEME.light;
+  const { t, isRTL } = useI18n();
+  const palette = useMemo(
+    () => ({
+      bg: theme.colors.background,
+      card: theme.colors.card,
+      surface: theme.colors.card,
+      hover: theme.colors.backgroundAlt,
+      border: theme.colors.border,
+      rowBorder: hexToRgba(theme.colors.border, 0.7),
+      text: theme.colors.text,
+      textSecondary: theme.colors.textMuted,
+      primary: theme.colors.primary,
+      primaryDark: theme.colors.background,
+      danger: theme.colors.danger,
+    }),
+    [theme.colors],
+  );
+  const isIOS = Platform.OS === "ios";
+
   const surahList = useAppStore((s) => s.surahList);
   const lastRead = useAppStore((s) => s.lastRead);
   const setSurahList = useAppStore((s) => s.setSurahList);
 
   const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState<SortBy>("number");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const filterLabels = useMemo(
+    () =>
+      isRTL
+        ? {
+            filter: "تصفية",
+            byNumber: "حسب الرقم",
+            byName: "حسب الاسم",
+            byAyahs: "حسب عدد الآيات",
+            ascending: "تصاعدي",
+            descending: "تنازلي",
+          }
+        : {
+            filter: "Filter",
+            byNumber: "By Number",
+            byName: "By Name",
+            byAyahs: "By Ayahs",
+            ascending: "Ascending",
+            descending: "Descending",
+          },
+    [isRTL],
+  );
 
   const loadSurahs = async () => {
     setIsLoading(true);
@@ -83,11 +110,63 @@ export const QuranListScreen = () => {
 
   const filtered = useMemo(() => {
     const search = query.trim().toLowerCase();
-    if (!search) return surahList;
-    return surahList.filter((s) =>
-      [s.name, s.englishName, s.englishNameTranslation, `${s.number}`].join(" ").toLowerCase().includes(search),
-    );
-  }, [query, surahList]);
+    const searched = !search
+      ? surahList
+      : surahList.filter((s) =>
+          [s.name, s.englishName, s.englishNameTranslation, `${s.number}`]
+            .join(" ")
+            .toLowerCase()
+            .includes(search),
+        );
+
+    const sorted = [...searched].sort((a, b) => {
+      if (sortBy === "number") return a.number - b.number;
+      if (sortBy === "ayahs") return a.numberOfAyahs - b.numberOfAyahs;
+      return a.englishName.localeCompare(b.englishName, undefined, { sensitivity: "base" });
+    });
+
+    return sortDirection === "asc" ? sorted : sorted.reverse();
+  }, [query, sortBy, sortDirection, surahList]);
+
+  const renderFilterMenu = () => (
+    <Stack.Toolbar.Menu icon="line.3.horizontal.decrease.circle" title={filterLabels.filter}>
+      <Stack.Toolbar.MenuAction
+        icon="number"
+        isOn={sortBy === "number"}
+        onPress={() => setSortBy("number")}
+      >
+        {filterLabels.byNumber}
+      </Stack.Toolbar.MenuAction>
+      <Stack.Toolbar.MenuAction
+        icon="textformat"
+        isOn={sortBy === "name"}
+        onPress={() => setSortBy("name")}
+      >
+        {filterLabels.byName}
+      </Stack.Toolbar.MenuAction>
+      <Stack.Toolbar.MenuAction
+        icon="list.number"
+        isOn={sortBy === "ayahs"}
+        onPress={() => setSortBy("ayahs")}
+      >
+        {filterLabels.byAyahs}
+      </Stack.Toolbar.MenuAction>
+      <Stack.Toolbar.MenuAction
+        icon="arrow.up"
+        isOn={sortDirection === "asc"}
+        onPress={() => setSortDirection("asc")}
+      >
+        {filterLabels.ascending}
+      </Stack.Toolbar.MenuAction>
+      <Stack.Toolbar.MenuAction
+        icon="arrow.down"
+        isOn={sortDirection === "desc"}
+        onPress={() => setSortDirection("desc")}
+      >
+        {filterLabels.descending}
+      </Stack.Toolbar.MenuAction>
+    </Stack.Toolbar.Menu>
+  );
 
   const renderItem = ({ item }: { item: SurahSummary }) => (
     <Pressable
@@ -102,18 +181,18 @@ export const QuranListScreen = () => {
     >
       <View style={styles.rowLeft}>
         <View style={styles.badgeWrap}>
-          <View style={[styles.badgeDiamond, { borderColor: "rgba(176,137,104,0.3)" }]} />
-          <Text style={[styles.badgeNumber, { color: theme.mode === "dark" ? "#fff" : "#334155" }]}>{item.number}</Text>
+          <View style={[styles.badgeDiamond, { borderColor: hexToRgba(palette.primary, 0.3) }]} />
+          <Text style={[styles.badgeNumber, { color: palette.text }]}>{item.number}</Text>
         </View>
 
         <View style={styles.surahInfo}>
           <Text style={[styles.surahTitle, { color: palette.text }]}>{item.englishName}</Text>
           <View style={styles.surahMetaRow}>
-            <Text style={[styles.surahMetaText, { color: theme.mode === "dark" ? palette.textAccentMuted : palette.textSecondary }]}>
+            <Text style={[styles.surahMetaText, { color: palette.textSecondary }]}>
               {item.englishNameTranslation}
             </Text>
-            <View style={[styles.metaDot, { backgroundColor: theme.mode === "dark" ? palette.darkSurface : "#cbd5e1" }]} />
-            <Text style={[styles.surahMetaText, { color: theme.mode === "dark" ? palette.textAccentMuted : palette.textSecondary }]}>
+            <View style={[styles.metaDot, { backgroundColor: palette.border }]} />
+            <Text style={[styles.surahMetaText, { color: palette.textSecondary }]}>
               {t("quran.ayahsCount", { n: item.numberOfAyahs })}
             </Text>
           </View>
@@ -128,144 +207,176 @@ export const QuranListScreen = () => {
     </Pressable>
   );
 
-  return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: palette.bg }]} edges={["top"]}>
-      <View
-        style={[
-          styles.header,
-          {
-            backgroundColor: theme.mode === "dark" ? "rgba(16,34,25,0.95)" : "rgba(246,248,247,0.95)",
-            borderBottomColor: palette.border,
-          },
-        ]}
-      >
-        <View style={styles.headerTop}>
-          <Text style={[styles.headerTitle, { color: palette.text }]}>{t("quran.title")}</Text>
-          <Pressable
-            onPress={() => router.push("/settings")}
-            style={({ pressed }) => [
-              styles.iconButton,
-              {
-                backgroundColor: pressed ? palette.darkSurface : "transparent",
-              },
-            ]}
-          >
-            <MaterialIcons
-              name="settings"
-              size={22}
-              color={theme.mode === "dark" ? palette.textAccentMuted : palette.textSecondary}
-            />
-          </Pressable>
-        </View>
-
+  const listHeader = (
+    <View style={styles.listHeaderWrap}>
+      {!isIOS ? (
         <View style={styles.searchRow}>
           <View style={styles.searchWrap}>
             <MaterialIcons
               name="search"
               size={20}
-              color={theme.mode === "dark" ? palette.textAccentMuted : "#94a3b8"}
+              color={palette.textSecondary}
               style={styles.searchIcon}
             />
             <TextInput
               value={query}
               onChangeText={setQuery}
               placeholder={t("quran.searchPlaceholder")}
-              placeholderTextColor={theme.mode === "dark" ? "rgba(146,201,173,0.6)" : "#94a3b8"}
+              placeholderTextColor={palette.textSecondary}
               style={[
                 styles.searchInput,
                 {
                   backgroundColor: palette.surface,
                   color: palette.text,
-                  borderColor: "transparent",
+                  borderColor: palette.border,
                 },
               ]}
             />
           </View>
 
           <Pressable
-            style={({ pressed }) => [
+            onPress={() => {
+              if (sortBy === "number") {
+                setSortBy("name");
+                return;
+              }
+              if (sortBy === "name") {
+                setSortBy("ayahs");
+                return;
+              }
+              setSortBy("number");
+            }}
+            onLongPress={() => setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))}
+            style={[
               styles.filterButton,
               {
                 backgroundColor: palette.surface,
-                borderColor: pressed ? palette.primary : "transparent",
+                borderColor: palette.border,
               },
             ]}
           >
-            <MaterialIcons
-              name="filter-list"
-              size={22}
-              color={theme.mode === "dark" ? palette.textAccentMuted : palette.textSecondary}
-            />
+            <MaterialIcons name="filter-list" size={22} color={palette.textSecondary} />
           </Pressable>
-        </View>
-
-        {lastRead ? (
-          <Pressable
-            onPress={() =>
-              router.push({
-                pathname: "/quran/[surahNumber]",
-                params: {
-                  surahNumber: String(lastRead.surahNumber),
-                  initialAyahNumber: String(lastRead.ayahNumber),
-                },
-              })
-            }
-            style={({ pressed }) => [
-              styles.resumePill,
-              {
-                backgroundColor: pressed ? "rgba(176,137,104,0.25)" : "rgba(176,137,104,0.16)",
-                borderColor: "rgba(176,137,104,0.12)",
-              },
-            ]}
-          >
-            <View style={styles.resumeLeft}>
-              <View style={[styles.resumeIconWrap, { backgroundColor: palette.primary }]}>
-                <MaterialIcons name="auto-stories" size={15} color={palette.primaryDark} />
-              </View>
-              <View>
-                <Text style={[styles.resumeKicker, { color: palette.primary }]}>{t("quran.continueReading")}</Text>
-                <Text style={[styles.resumeText, { color: palette.text }]}>
-                  {lastRead.surahName}: {t("quran.ayahLabel", { n: lastRead.ayahNumber })}
-                </Text>
-              </View>
-            </View>
-            <MaterialIcons name="arrow-forward" size={20} color={palette.primary} />
-          </Pressable>
-        ) : null}
-      </View>
-
-      {error ? (
-        <View style={[styles.errorBanner, { borderColor: "rgba(239,68,68,0.2)" }]}>
-          <Text style={styles.errorTitle}>{t("quran.errorRefreshList")}</Text>
-          <Text style={[styles.errorBody, { color: theme.mode === "dark" ? palette.textAccentMuted : palette.textSecondary }]}>
-            {error}
-          </Text>
         </View>
       ) : null}
 
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => `${item.number}`}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={() => void loadSurahs()} tintColor={palette.primary} />
-        }
-        ListEmptyComponent={
-          !isLoading ? (
-            <View style={[styles.emptyWrap, { borderColor: palette.border, backgroundColor: palette.surface }]}>
-              <MaterialIcons name="menu-book" size={28} color={palette.primary} />
-              <Text style={[styles.emptyTitle, { color: palette.text }]}>{t("quran.noSurahs")}</Text>
-              <Text style={[styles.emptySub, { color: theme.mode === "dark" ? palette.textAccentMuted : palette.textSecondary }]}>
-                {query ? t("quran.tryAnotherSearch") : t("quran.pullToRefreshList")}
+      {lastRead ? (
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: "/quran/[surahNumber]",
+              params: {
+                surahNumber: String(lastRead.surahNumber),
+                initialAyahNumber: String(lastRead.ayahNumber),
+              },
+            })
+          }
+          style={({ pressed }) => [
+            styles.resumePill,
+            {
+              backgroundColor: pressed ? hexToRgba(palette.primary, 0.25) : hexToRgba(palette.primary, 0.16),
+              borderColor: hexToRgba(palette.primary, 0.12),
+            },
+          ]}
+        >
+          <View style={styles.resumeLeft}>
+            <View style={[styles.resumeIconWrap, { backgroundColor: palette.primary }]}> 
+              <MaterialIcons name="auto-stories" size={15} color={palette.primaryDark} />
+            </View>
+            <View>
+              <Text style={[styles.resumeKicker, { color: palette.primary }]}>{t("quran.continueReading")}</Text>
+              <Text style={[styles.resumeText, { color: palette.text }]}> 
+                {lastRead.surahName}: {t("quran.ayahLabel", { n: lastRead.ayahNumber })}
               </Text>
             </View>
-          ) : null
-        }
-        ListFooterComponent={isLoading ? <Text style={[styles.footerText, { color: palette.primary }]}>{t("quran.loadingList")}</Text> : null}
+          </View>
+          <MaterialIcons name="arrow-forward" size={20} color={palette.primary} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+
+  return (
+    <>
+      <Stack.Screen
+        options={{
+          headerShown: isIOS,
+          headerTransparent: true,
+          headerStyle: { backgroundColor: "transparent" },
+          headerShadowVisible: false,
+          headerBackVisible: false,
+          headerTitle: "",
+          headerRight: () => null,
+          headerLeft: () => null,
+          headerTintColor: palette.primary,
+        }}
       />
-    </SafeAreaView>
+
+      {isIOS ? (
+        <>
+          <Stack.SearchBar
+            placeholder={t("quran.searchPlaceholder")}
+            placement="integratedButton"
+            allowToolbarIntegration
+            hideNavigationBar={false}
+            hideWhenScrolling={false}
+            obscureBackground={false}
+            autoCapitalize="words"
+            onChangeText={(event) => setQuery(event.nativeEvent.text)}
+            onCancelButtonPress={() => setQuery("")}
+          />
+
+          <Stack.Toolbar placement="right">
+            {renderFilterMenu()}
+          </Stack.Toolbar>
+        </>
+      ) : null}
+
+      <SafeAreaView style={[styles.safe, { backgroundColor: palette.bg }]} edges={isIOS ? ["left", "right"] : ["top", "left", "right"]}>
+        {error ? (
+          <View
+            style={[
+              styles.errorBanner,
+              {
+                borderColor: hexToRgba(palette.danger, 0.25),
+                backgroundColor: hexToRgba(palette.danger, 0.08),
+              },
+            ]}
+          >
+            <Text style={[styles.errorTitle, { color: palette.danger }]}>{t("quran.errorRefreshList")}</Text>
+            <Text style={[styles.errorBody, { color: palette.textSecondary }]}>{error}</Text>
+          </View>
+        ) : null}
+
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => `${item.number}`}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          contentInsetAdjustmentBehavior={isIOS ? "automatic" : "never"}
+          automaticallyAdjustContentInsets={isIOS}
+          refreshControl={
+            <RefreshControl refreshing={isLoading} onRefresh={() => void loadSurahs()} tintColor={palette.primary} />
+          }
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={
+            !isLoading ? (
+              <View style={[styles.emptyWrap, { borderColor: palette.border, backgroundColor: palette.surface }]}> 
+                <MaterialIcons name="menu-book" size={28} color={palette.primary} />
+                <Text style={[styles.emptyTitle, { color: palette.text }]}>{t("quran.noSurahs")}</Text>
+                <Text style={[styles.emptySub, { color: palette.textSecondary }]}> 
+                  {query ? t("quran.tryAnotherSearch") : t("quran.pullToRefreshList")}
+                </Text>
+              </View>
+            ) : null
+          }
+          ListFooterComponent={
+            isLoading ? <Text style={[styles.footerText, { color: palette.primary }]}>{t("quran.loadingList")}</Text> : null
+          }
+        />
+      </SafeAreaView>
+    </>
   );
 };
 
@@ -273,34 +384,14 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
   },
-  header: {
-    paddingHorizontal: 16,
+  listHeaderWrap: {
     paddingTop: 8,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-  },
-  headerTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 14,
-  },
-  headerTitle: {
-    fontSize: 30,
-    fontWeight: "700",
-    letterSpacing: -0.5,
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
+    paddingBottom: 6,
   },
   searchRow: {
     flexDirection: "row",
     gap: 12,
-    marginBottom: 6,
+    marginBottom: 10,
   },
   searchWrap: {
     flex: 1,
@@ -328,7 +419,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   resumePill: {
-    marginTop: 12,
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 12,
@@ -369,10 +459,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     padding: 10,
-    backgroundColor: "rgba(239,68,68,0.08)",
   },
   errorTitle: {
-    color: "#ef4444",
     fontSize: 12,
     fontWeight: "700",
   },

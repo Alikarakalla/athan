@@ -17,7 +17,7 @@ export const Card = ({ children, style }: CardProps) => {
         {
           backgroundColor: theme.colors.card,
           borderColor: theme.colors.border,
-          shadowColor: theme.mode === "dark" ? "#000" : "#7D715A",
+          shadowColor: theme.colors.primary,
         },
         style,
       ]}
@@ -38,4 +38,3 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 });
-

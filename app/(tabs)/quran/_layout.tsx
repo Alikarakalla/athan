@@ -20,7 +20,7 @@ export default function QuranStackLayout() {
         },
       }}
     >
-      <Stack.Screen name="index" options={{ headerShown: false, title: "Quran" }} />
+      <Stack.Screen name="index" options={{ title: "Quran" }} />
     </Stack>
   );
 }

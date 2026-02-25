@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
+  Platform,
   Pressable,
   Share,
   StyleSheet,
@@ -11,14 +12,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
-import {
-  Audio,
-  InterruptionModeAndroid,
-  InterruptionModeIOS,
-  type AVPlaybackStatus,
-  type AVPlaybackStatusSuccess,
-} from "expo-av";
+import { Stack, router, useLocalSearchParams } from "expo-router";
+import { createAudioPlayer } from "expo-audio";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { fetchSurahAudioTrack, fetchSurahDetail } from "../api/quranApi";
@@ -26,6 +21,12 @@ import { EmptyState } from "../components/EmptyState";
 import { LoadingState } from "../components/LoadingState";
 import { useI18n } from "../hooks/useI18n";
 import { useAppTheme } from "../hooks/useAppTheme";
+import {
+  ensureQuranPlayback,
+  seekQuranToMillis,
+  setQuranCurrentAyah,
+  toggleQuranPlayback,
+} from "../services/quranPlayerService";
 import { useAppStore } from "../store/appStore";
 import type { AyahLine, SurahAudioTrack, SurahDetail } from "../types/quran";
 
@@ -34,32 +35,18 @@ interface SurahDetailScreenProps {
   initialAyahNumber?: number;
 }
 
-const READER_THEME = {
-  light: {
-    bg: "#f4efe6",
-    headerBg: "rgba(244,239,230,0.95)",
-    border: "#d8cfbf",
-    rowBorder: "#f3f4f6",
-    text: "#2a2118",
-    textMuted: "#776a58",
-    textAccentMuted: "#b79f82",
-    primary: "#B08968",
-    primaryDark: "#2F241A",
-    accentBg: "rgba(176,137,104,0.08)",
-  },
-  dark: {
-    bg: "#1A1511",
-    headerBg: "rgba(26,21,17,0.95)",
-    border: "rgba(255,255,255,0.06)",
-    rowBorder: "rgba(255,255,255,0.05)",
-    text: "#ffffff",
-    textMuted: "#cbd5e1",
-    textAccentMuted: "#C7AF8A",
-    primary: "#D0B089",
-    primaryDark: "#2F241A",
-    accentBg: "rgba(176,137,104,0.10)",
-  },
-} as const;
+const hexToRgba = (hex: string, alpha: number) => {
+  const clampedAlpha = Math.max(0, Math.min(1, alpha));
+  const clean = hex.replace("#", "").trim();
+  if (!/^[0-9a-fA-F]{6}$/.test(clean)) {
+    return `rgba(0,0,0,${clampedAlpha})`;
+  }
+  const value = Number.parseInt(clean, 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return `rgba(${r},${g},${b},${clampedAlpha})`;
+};
 
 const formatMs = (ms: number): string => {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -160,31 +147,53 @@ export const SurahDetailScreen = (props: SurahDetailScreenProps) => {
 
   const theme = useAppTheme();
   const { t } = useI18n();
-  const palette = theme.mode === "dark" ? READER_THEME.dark : READER_THEME.light;
+  const isIOS = Platform.OS === "ios";
+  const palette = useMemo(
+    () => ({
+      bg: theme.colors.background,
+      headerBg: hexToRgba(theme.colors.background, 0.95),
+      border: theme.colors.border,
+      rowBorder: hexToRgba(theme.colors.border, 0.5),
+      text: theme.colors.text,
+      textMuted: theme.colors.textMuted,
+      textAccentMuted: theme.colors.accent,
+      primary: theme.colors.primary,
+      primaryDark: theme.colors.background,
+      accentBg: hexToRgba(theme.colors.primary, 0.08),
+      danger: theme.colors.danger,
+      timelineTrack: hexToRgba(theme.colors.border, 0.75),
+    }),
+    [theme.colors],
+  );
   const bookmarks = useAppStore((s) => s.bookmarks);
   const lastRead = useAppStore((s) => s.lastRead);
   const quranReciterId = useAppStore((s) => s.quranReciterId);
   const toggleBookmark = useAppStore((s) => s.toggleBookmark);
   const setLastRead = useAppStore((s) => s.setLastRead);
+  const quranPlayer = useAppStore((s) => s.quranPlayer);
 
   const [surahDetail, setSurahDetail] = useState<SurahDetail | null>(null);
   const [audioTrack, setAudioTrack] = useState<SurahAudioTrack | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [audioError, setAudioError] = useState<string | null>(null);
   const [ayahDurationProfileMs, setAyahDurationProfileMs] = useState<number[] | null>(null);
   const [isTimingProfileLoading, setIsTimingProfileLoading] = useState(false);
 
   const flatListRef = useRef<FlatList<AyahLine>>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
   const timelineWidthRef = useRef(0);
   const currentAyahIndexRef = useRef(0);
 
-  const [isAudioLoading, setIsAudioLoading] = useState(false);
-  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [currentAudioIndex, setCurrentAudioIndex] = useState(0);
-  const [positionMillis, setPositionMillis] = useState(0);
-  const [durationMillis, setDurationMillis] = useState(0);
+  const [scrubProgress, setScrubProgress] = useState<number | null>(null);
+  const [timelineWidth, setTimelineWidth] = useState(0);
+
+  const activeSourceUrl = audioTrack?.fullSurahUrl ?? null;
+  const isCurrentTrackActive = !!activeSourceUrl && quranPlayer.sourceUrl === activeSourceUrl;
+  const isAudioLoading = isCurrentTrackActive ? quranPlayer.isLoading : false;
+  const isAudioPlaying = isCurrentTrackActive ? quranPlayer.isPlaying : false;
+  const positionMillis = isCurrentTrackActive ? quranPlayer.positionMillis : 0;
+  const durationMillis = isCurrentTrackActive ? quranPlayer.durationMillis : 0;
+  const audioError = isCurrentTrackActive ? quranPlayer.error : null;
 
   const firstAyahHasBismillah = useMemo(() => {
     const first = surahDetail?.ayahs?.[0]?.arabicText ?? "";
@@ -222,18 +231,37 @@ export const SurahDetailScreen = (props: SurahDetailScreenProps) => {
     () => (durationMillis > 0 ? clamp(positionMillis / durationMillis) : 0),
     [durationMillis, positionMillis],
   );
+  const displayedProgress = scrubProgress ?? streamProgress;
+  const displayedPositionMillis =
+    scrubProgress !== null && durationMillis > 0 ? Math.floor(durationMillis * scrubProgress) : positionMillis;
 
   useEffect(() => {
+    const commitCurrentAyah = (index: number) => {
+      const ayahNumber = surahDetail?.ayahs?.[index]?.numberInSurah ?? null;
+      if (isCurrentTrackActive && ayahNumber !== null) {
+        setQuranCurrentAyah(ayahNumber);
+      }
+    };
+
     if (audioTrack?.verseTimestamps?.length) {
       const index = findCurrentAyahIndexByTimestamps(audioTrack.verseTimestamps, positionMillis);
       currentAyahIndexRef.current = index;
       setCurrentAudioIndex(index);
+      commitCurrentAyah(index);
       return;
     }
     const index = findCurrentAyahIndexByProgress(ayahStartFractions, streamProgress);
     currentAyahIndexRef.current = index;
     setCurrentAudioIndex(index);
-  }, [audioTrack?.verseTimestamps, ayahStartFractions, positionMillis, streamProgress]);
+    commitCurrentAyah(index);
+  }, [
+    audioTrack?.verseTimestamps,
+    ayahStartFractions,
+    isCurrentTrackActive,
+    positionMillis,
+    streamProgress,
+    surahDetail?.ayahs,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -263,26 +291,23 @@ export const SurahDetailScreen = (props: SurahDetailScreenProps) => {
         const durations: number[] = [];
         for (const uri of audioTrack.ayahAudioUrls) {
           if (cancelled) return;
-          let sound: Audio.Sound | null = null;
           try {
-            const created = await Audio.Sound.createAsync(
-              { uri },
-              { shouldPlay: false, progressUpdateIntervalMillis: 50 },
-            );
-            sound = created.sound;
-            const status = await sound.getStatusAsync();
-            durations.push(status.isLoaded ? status.durationMillis ?? 0 : 0);
+            const sound = createAudioPlayer(uri);
+            await new Promise((resolve) => {
+              const listener = sound.addListener('playbackStatusUpdate', (status) => {
+                if (status.isLoaded) {
+                  listener.remove();
+                  resolve(status);
+                }
+              });
+              setTimeout(() => { listener.remove(); resolve(null); }, 3000);
+            });
+            durations.push(sound.duration ? sound.duration * 1000 : 0);
+            sound.remove();
           } catch {
             durations.push(0);
-          } finally {
-            if (sound) {
-              try {
-                await sound.unloadAsync();
-              } catch {
-                // no-op
-              }
-            }
           }
+
         }
 
         if (cancelled) return;
@@ -301,190 +326,138 @@ export const SurahDetailScreen = (props: SurahDetailScreenProps) => {
     };
   }, [audioTrack?.ayahAudioUrls, audioTrack?.verseTimestamps, routeSurahNumber]);
 
-  const configureAudioMode = useCallback(async () => {
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
-      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-      interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-      shouldDuckAndroid: true,
-    });
-  }, []);
-
-  const unloadSound = useCallback(async () => {
-    const sound = soundRef.current;
-    if (!sound) return;
-    soundRef.current = null;
-    try {
-      await sound.unloadAsync();
-    } catch {
-      // Ignore cleanup errors.
-    }
-  }, []);
-
-  const ensureFullSurahSound = useCallback(
-    async (opts?: { shouldPlay?: boolean; startMillis?: number }) => {
-      if (!audioTrack?.fullSurahUrl) {
-        throw new Error("Full surah stream is unavailable for this reciter.");
-      }
-
-      const shouldPlay = opts?.shouldPlay;
-      const hasStartMillis = typeof opts?.startMillis === "number";
-      const startMillis = Math.max(0, opts?.startMillis ?? 0);
-
-      await configureAudioMode();
-
-      if (soundRef.current) {
-        const existingStatus = await soundRef.current.getStatusAsync();
-        if (existingStatus.isLoaded) {
-          if (hasStartMillis) {
-            await soundRef.current.setPositionAsync(startMillis);
-            setPositionMillis(startMillis);
-          }
-          if (shouldPlay === true) {
-            await soundRef.current.playAsync();
-          } else if (shouldPlay === false) {
-            await soundRef.current.pauseAsync();
-          }
-          return soundRef.current;
-        }
-      }
-
-      await unloadSound();
-
-      const onStatusUpdate = (status: AVPlaybackStatus) => {
-        if (!status.isLoaded) return;
-        const loaded = status as AVPlaybackStatusSuccess;
-        setIsAudioPlaying(loaded.isPlaying);
-        setPositionMillis(loaded.positionMillis ?? 0);
-        setDurationMillis(loaded.durationMillis ?? 0);
-
-        if (loaded.didJustFinish && !loaded.isLooping) {
-          setIsAudioPlaying(false);
-          setPositionMillis(loaded.durationMillis ?? 0);
-        }
-      };
-
-      const { sound, status } = await Audio.Sound.createAsync(
-        { uri: audioTrack.fullSurahUrl },
-        {
-          shouldPlay: shouldPlay ?? false,
-          positionMillis: startMillis,
-          progressUpdateIntervalMillis: 250,
-        },
-        onStatusUpdate,
-      );
-      soundRef.current = sound;
-
-      if (status.isLoaded) {
-        setPositionMillis(status.positionMillis ?? 0);
-        setDurationMillis(status.durationMillis ?? 0);
-        setIsAudioPlaying(status.isPlaying);
-        if ((status.durationMillis ?? 0) > 0 && (status.positionMillis ?? 0) > 0) {
-          const idx = audioTrack.verseTimestamps?.length
-            ? findCurrentAyahIndexByTimestamps(audioTrack.verseTimestamps, status.positionMillis ?? 0)
-            : findCurrentAyahIndexByProgress(
-                ayahStartFractions,
-                (status.positionMillis ?? 0) / Math.max(1, status.durationMillis ?? 1),
-              );
-          currentAyahIndexRef.current = idx;
-          setCurrentAudioIndex(idx);
-        }
-      }
-
-      return sound;
-    },
-    [audioTrack?.fullSurahUrl, audioTrack?.verseTimestamps, ayahStartFractions, configureAudioMode, unloadSound],
-  );
-
   const seekToProgress = useCallback(
     async (progress: number, shouldPlay = true) => {
       const bounded = clamp(progress);
-      setAudioError(null);
-      setIsAudioLoading(true);
       try {
         const approxDuration = durationMillis > 0 ? durationMillis : 0;
         const targetMillis = approxDuration > 0 ? Math.floor(approxDuration * bounded) : 0;
-        const sound = await ensureFullSurahSound({ shouldPlay, startMillis: targetMillis });
+        if (!audioTrack?.fullSurahUrl || !surahDetail) return;
+        const sound = await ensureQuranPlayback({
+          track: {
+            sourceUrl: audioTrack.fullSurahUrl,
+            surahNumber: routeSurahNumber,
+            surahName: surahDetail.surah.englishName,
+            totalAyahs: surahDetail.ayahs.length,
+          },
+          shouldPlay,
+          startMillis: targetMillis,
+        });
 
         if (targetMillis === 0 && durationMillis <= 0) {
-          const freshStatus = await sound.getStatusAsync();
-          if (freshStatus.isLoaded && freshStatus.durationMillis) {
-            const resolvedTarget = Math.floor(freshStatus.durationMillis * bounded);
-            await sound.setPositionAsync(resolvedTarget);
-            if (shouldPlay) await sound.playAsync();
-            setPositionMillis(resolvedTarget);
-            setDurationMillis(freshStatus.durationMillis);
+          if (sound.isLoaded && sound.duration) {
+            const resolvedTarget = Math.floor(sound.duration * 1000 * bounded);
+            await seekQuranToMillis(resolvedTarget, shouldPlay);
           }
         }
       } catch (err) {
-        setAudioError(err instanceof Error ? err.message : "Unable to seek audio");
-      } finally {
-        setIsAudioLoading(false);
+        // Keep screen stable; error is already reflected in global player state.
       }
     },
-    [durationMillis, ensureFullSurahSound],
+    [audioTrack?.fullSurahUrl, durationMillis, routeSurahNumber, surahDetail],
   );
 
   const togglePlayback = useCallback(async () => {
-    if (!audioTrack?.fullSurahUrl) return;
-    setAudioError(null);
-    setIsAudioLoading(true);
+    if (!audioTrack?.fullSurahUrl || !surahDetail) return;
     try {
-      const sound = await ensureFullSurahSound();
-      const status = await sound.getStatusAsync();
-      if (!status.isLoaded) {
-        await ensureFullSurahSound({ shouldPlay: true });
-      } else if (status.isPlaying) {
-        await sound.pauseAsync();
-        setIsAudioPlaying(false);
-      } else {
-        await sound.playAsync();
-        setIsAudioPlaying(true);
+      if (!isCurrentTrackActive) {
+        await ensureQuranPlayback({
+          track: {
+            sourceUrl: audioTrack.fullSurahUrl,
+            surahNumber: routeSurahNumber,
+            surahName: surahDetail.surah.englishName,
+            totalAyahs: surahDetail.ayahs.length,
+          },
+          shouldPlay: true,
+          startMillis: 0,
+        });
+        return;
       }
+      await toggleQuranPlayback();
     } catch (err) {
-      setAudioError(err instanceof Error ? err.message : "Audio action failed");
-    } finally {
-      setIsAudioLoading(false);
+      // Keep screen stable; error is already reflected in global player state.
     }
-  }, [audioTrack?.fullSurahUrl, ensureFullSurahSound]);
+  }, [
+    audioTrack?.fullSurahUrl,
+    isCurrentTrackActive,
+    routeSurahNumber,
+    surahDetail,
+  ]);
 
   const playFromAyahNumber = useCallback(
     async (ayahNumberInSurah: number) => {
-      if (!surahDetail?.ayahs.length) return;
+      if (!surahDetail?.ayahs.length || !audioTrack?.fullSurahUrl) return;
       const index = surahDetail.ayahs.findIndex((a) => a.numberInSurah === ayahNumberInSurah);
       if (index < 0) return;
       const exactStartMs = audioTrack?.verseTimestamps?.[index]?.timestampFrom;
       if (typeof exactStartMs === "number") {
-        setAudioError(null);
-        setIsAudioLoading(true);
         try {
-          await ensureFullSurahSound({ shouldPlay: true, startMillis: exactStartMs });
+          await ensureQuranPlayback({
+            track: {
+              sourceUrl: audioTrack.fullSurahUrl,
+              surahNumber: routeSurahNumber,
+              surahName: surahDetail.surah.englishName,
+              totalAyahs: surahDetail.ayahs.length,
+            },
+            shouldPlay: true,
+            startMillis: exactStartMs,
+          });
           currentAyahIndexRef.current = index;
           setCurrentAudioIndex(index);
+          setQuranCurrentAyah(surahDetail.ayahs[index]?.numberInSurah ?? null);
         } catch (err) {
-          setAudioError(err instanceof Error ? err.message : "Unable to jump to ayah");
-        } finally {
-          setIsAudioLoading(false);
+          // Keep screen stable; error is already reflected in global player state.
         }
         return;
       }
       const startFraction = ayahStartFractions[index] ?? 0;
       await seekToProgress(startFraction, true);
     },
-    [audioTrack?.verseTimestamps, ayahStartFractions, ensureFullSurahSound, seekToProgress, surahDetail?.ayahs],
+    [audioTrack?.fullSurahUrl, audioTrack?.verseTimestamps, ayahStartFractions, routeSurahNumber, seekToProgress, surahDetail],
   );
 
   const onTimelineLayout = (event: LayoutChangeEvent) => {
-    timelineWidthRef.current = event.nativeEvent.layout.width;
+    const width = event.nativeEvent.layout.width;
+    timelineWidthRef.current = width;
+    setTimelineWidth(width);
   };
 
-  const onTimelinePress = async (x: number) => {
+  const onTimelinePress = useCallback(async (x: number) => {
     const width = timelineWidthRef.current;
     if (!width) return;
-    await seekToProgress(x / width, true);
-  };
+    const progress = clamp(x / width);
+    setScrubProgress(progress);
+    await seekToProgress(progress, isAudioPlaying);
+    setScrubProgress(null);
+  }, [isAudioPlaying, seekToProgress]);
+
+  const onTimelineScrubStart = useCallback((x: number) => {
+    const width = timelineWidthRef.current;
+    if (!width) return;
+    setScrubProgress(clamp(x / width));
+  }, []);
+
+  const onTimelineScrubMove = useCallback((x: number) => {
+    const width = timelineWidthRef.current;
+    if (!width) return;
+    setScrubProgress(clamp(x / width));
+  }, []);
+
+  const onTimelineScrubEnd = useCallback(
+    (x: number) => {
+      const width = timelineWidthRef.current;
+      if (!width) {
+        setScrubProgress(null);
+        return;
+      }
+      const progress = clamp(x / width);
+      setScrubProgress(progress);
+      void seekToProgress(progress, isAudioPlaying).finally(() => {
+        setScrubProgress(null);
+      });
+    },
+    [isAudioPlaying, seekToProgress],
+  );
 
   useEffect(() => {
     if (!Number.isFinite(routeSurahNumber) || routeSurahNumber <= 0) {
@@ -497,7 +470,6 @@ export const SurahDetailScreen = (props: SurahDetailScreenProps) => {
     const load = async () => {
       setIsLoading(true);
       setError(null);
-      setAudioError(null);
       try {
         const [detail, audio] = await Promise.all([
           fetchSurahDetail(routeSurahNumber),
@@ -506,15 +478,12 @@ export const SurahDetailScreen = (props: SurahDetailScreenProps) => {
         if (!isMounted) return;
         setSurahDetail(detail);
         setAudioTrack(audio);
-        setPositionMillis(0);
-        setDurationMillis(0);
         setAyahDurationProfileMs(null);
         const initialIndex = routeInitialAyah
           ? Math.max(0, detail.ayahs.findIndex((a) => a.numberInSurah === routeInitialAyah))
           : 0;
         currentAyahIndexRef.current = initialIndex;
         setCurrentAudioIndex(initialIndex);
-        await unloadSound();
       } catch (err) {
         if (!isMounted) return;
         setError(err instanceof Error ? err.message : "Failed to load surah");
@@ -527,13 +496,7 @@ export const SurahDetailScreen = (props: SurahDetailScreenProps) => {
     return () => {
       isMounted = false;
     };
-  }, [quranReciterId, routeInitialAyah, routeSurahNumber, unloadSound]);
-
-  useEffect(() => {
-    return () => {
-      void unloadSound();
-    };
-  }, [unloadSound]);
+  }, [quranReciterId, routeInitialAyah, routeSurahNumber]);
 
   const scrollToAyah = useCallback(
     (ayahNumber?: number) => {
@@ -584,6 +547,8 @@ export const SurahDetailScreen = (props: SurahDetailScreenProps) => {
   const resumeAyahForThisSurah =
     lastRead?.surahNumber === routeSurahNumber ? lastRead.ayahNumber : routeInitialAyah;
   const currentPlayingAyah = surahDetail?.ayahs[currentAudioIndex]?.numberInSurah;
+  const surahTopTitle = surahDetail?.surah.englishName ?? t("quran.title");
+  const iosToolbarReservedSpace = 108;
 
   const renderAyah = ({ item }: { item: AyahLine }) => {
     const bookmarkId = `${routeSurahNumber}:${item.numberInSurah}`;
@@ -640,12 +605,12 @@ export const SurahDetailScreen = (props: SurahDetailScreenProps) => {
         <View style={styles.ayahBody}>
           <Text style={[styles.arabicText, { color: palette.text }]}>
             {item.arabicText}
-            <Text style={[styles.ayahNumberInline, { borderColor: "rgba(176,137,104,0.4)", color: palette.primary }]}>
+            <Text style={[styles.ayahNumberInline, { borderColor: hexToRgba(palette.primary, 0.4), color: palette.primary }]}>
               {" "}
               {item.numberInSurah}{" "}
             </Text>
           </Text>
-          <Text style={[styles.translationText, { color: theme.mode === "dark" ? "#94a3b8" : "#6b7280" }]}>
+          <Text style={[styles.translationText, { color: palette.textMuted }]}>
             {item.translationText}
           </Text>
         </View>
@@ -653,151 +618,294 @@ export const SurahDetailScreen = (props: SurahDetailScreenProps) => {
     );
   };
 
+  const topToolbar = (
+    <>
+      <Stack.Screen
+        options={{
+          headerShown: isIOS,
+          headerTransparent: true,
+          headerStyle: { backgroundColor: "transparent" },
+          headerShadowVisible: false,
+          headerBackVisible: false,
+          headerTintColor: palette.text,
+          headerTitleAlign: "center",
+          headerTitle: "",
+          headerLeft: () => null,
+          headerRight: () => null,
+        }}
+      />
+      {isIOS ? (
+        <>
+          <Stack.Screen.Title
+            style={{
+              color: palette.text,
+              fontSize: 20,
+              fontWeight: "700",
+            }}
+          >
+            {surahTopTitle}
+          </Stack.Screen.Title>
+          <Stack.Toolbar placement="left">
+            <Stack.Toolbar.Button icon="chevron.backward" onPress={() => router.back()} />
+          </Stack.Toolbar>
+        </>
+      ) : null}
+    </>
+  );
+
   if (isLoading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: palette.bg }]}>
-        <LoadingState label={t("quran.loadingSurah")} />
-      </View>
+      <>
+        {topToolbar}
+        <View style={[styles.loadingContainer, { backgroundColor: palette.bg }]}>
+          <LoadingState label={t("quran.loadingSurah")} />
+        </View>
+      </>
     );
   }
 
   if (error || !surahDetail) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: palette.bg }]}>
-        <EmptyState title={t("quran.unableToLoadSurah")} subtitle={error ?? t("quran.unknownError")} />
-      </View>
+      <>
+        {topToolbar}
+        <View style={[styles.loadingContainer, { backgroundColor: palette.bg }]}>
+          <EmptyState title={t("quran.unableToLoadSurah")} subtitle={error ?? t("quran.unknownError")} />
+        </View>
+      </>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: palette.bg }]} edges={["top"]}>
-      <View style={[styles.header, { backgroundColor: palette.headerBg, borderBottomColor: palette.border }]}>
-        <View style={styles.headerTopRow}>
-          <Pressable onPress={() => router.back()} style={styles.headerIcon}>
-            <MaterialIcons name="arrow-back" size={28} color={palette.text} />
-          </Pressable>
-
-          <View style={styles.headerTitleWrap}>
-            <Text style={[styles.headerTitle, { color: palette.text }]} numberOfLines={1}>
-              {t("quran.surahPrefix", { name: surahDetail.surah.englishName })}
-            </Text>
-            <Text
-              style={[
-                styles.headerSubtitle,
-                { color: theme.mode === "dark" ? palette.textAccentMuted : palette.textMuted },
-              ]}
-              numberOfLines={1}
-            >
-              {surahDetail.surah.englishNameTranslation} • {surahDetail.surah.revelationType} • {t("quran.versesCount", { n: surahDetail.surah.numberOfAyahs })}
-            </Text>
-          </View>
-
-          <Pressable style={styles.headerIcon}>
-            <MaterialIcons name="more-vert" size={26} color={palette.text} />
-          </Pressable>
-        </View>
-
-        <View style={styles.audioRow}>
-          <Pressable
-            onPress={() => void togglePlayback()}
-            disabled={!audioTrack?.fullSurahUrl || isAudioLoading}
-            style={({ pressed }) => [
-              styles.audioPlayButtonWrap,
-              { opacity: pressed ? 0.9 : 1 },
-              (!audioTrack?.fullSurahUrl || isAudioLoading) && styles.dimmed,
-            ]}
-          >
-            <MaterialIcons
-              name={isAudioLoading ? "hourglass-empty" : isAudioPlaying ? "pause" : "play-arrow"}
-              size={24}
-              color={palette.primaryDark}
-            />
-          </Pressable>
-
-          <View style={styles.audioBarWrap}>
-            <Pressable
-              onLayout={onTimelineLayout}
-              onPress={(e) => void onTimelinePress(e.nativeEvent.locationX)}
-              style={[
-                styles.audioBarTrack,
-                { backgroundColor: theme.mode === "dark" ? "rgba(255,255,255,0.10)" : "#e5e7eb" },
-              ]}
-            >
-              <View
-                style={[
-                  styles.audioBarFill,
-                  {
-                    backgroundColor: palette.primary,
-                    width: `${streamProgress * 100}%`,
-                  },
+    <>
+      {topToolbar}
+      {isIOS ? (
+        <Stack.Toolbar placement="bottom">
+          <Stack.Toolbar.View separateBackground>
+            <View style={styles.toolbarPlayerWrap}>
+              <Pressable
+                onPress={() => void togglePlayback()}
+                disabled={!audioTrack?.fullSurahUrl || isAudioLoading}
+                style={({ pressed }) => [
+                  styles.audioPlayButtonWrap,
+                  styles.toolbarPlayButton,
+                  { backgroundColor: palette.primary, shadowColor: palette.primary },
+                  { opacity: pressed ? 0.9 : 1 },
+                  (!audioTrack?.fullSurahUrl || isAudioLoading) && styles.dimmed,
                 ]}
-              />
-            </Pressable>
-            <View style={styles.audioTimeRow}>
-              <Text style={[styles.audioTimeText, { color: theme.mode === "dark" ? palette.textAccentMuted : palette.textMuted }]}>
-                {formatMs(positionMillis)}
-              </Text>
-              <Text style={[styles.audioTimeText, { color: theme.mode === "dark" ? palette.textAccentMuted : palette.textMuted }]}>
-                {durationMillis > 0 ? formatMs(durationMillis) : "--:--"} • {t("quran.ayahLabel", { n: currentPlayingAyah ?? 1 })}/{surahDetail.ayahs.length}
-              </Text>
+              >
+                <MaterialIcons
+                  name={isAudioLoading ? "hourglass-empty" : isAudioPlaying ? "pause" : "play-arrow"}
+                  size={20}
+                  color={palette.primaryDark}
+                />
+              </Pressable>
+
+              <View style={styles.toolbarAudioMeta}>
+                <Text style={[styles.toolbarTitleText, { color: palette.text }]} numberOfLines={1}>
+                  {surahDetail.surah.englishName} • {t("quran.ayahLabel", { n: currentPlayingAyah ?? 1 })}
+                </Text>
+                <Pressable
+                  onLayout={onTimelineLayout}
+                  onPress={(e) => void onTimelinePress(e.nativeEvent.locationX)}
+                  onStartShouldSetResponder={() => true}
+                  onMoveShouldSetResponder={() => true}
+                  onResponderGrant={(e) => onTimelineScrubStart(e.nativeEvent.locationX)}
+                  onResponderMove={(e) => onTimelineScrubMove(e.nativeEvent.locationX)}
+                  onResponderRelease={(e) => onTimelineScrubEnd(e.nativeEvent.locationX)}
+                  onResponderTerminate={() => setScrubProgress(null)}
+                  style={[
+                    styles.audioBarTrack,
+                    styles.toolbarTrack,
+                    { backgroundColor: palette.timelineTrack },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.audioBarFill,
+                        {
+                          backgroundColor: palette.primary,
+                          width: `${displayedProgress * 100}%`,
+                        },
+                      ]}
+                    />
+                  <View
+                    pointerEvents="none"
+                    style={[
+                      styles.audioBarThumb,
+                      {
+                        backgroundColor: palette.primary,
+                        left: Math.max(0, Math.min(Math.max(0, timelineWidth - 12), timelineWidth * displayedProgress - 6)),
+                      },
+                    ]}
+                  />
+                </Pressable>
+                <Text style={[styles.toolbarTimeText, { color: palette.textMuted }]} numberOfLines={1}>
+                  {formatMs(displayedPositionMillis)} / {durationMillis > 0 ? formatMs(durationMillis) : "--:--"}
+                </Text>
+              </View>
+
+              <Pressable onPress={() => scrollToAyah(currentPlayingAyah)} style={styles.toolbarLocateButton}>
+                <MaterialIcons
+                  name="my-location"
+                  size={18}
+                  color={palette.textMuted}
+                />
+              </Pressable>
             </View>
-          </View>
-
-          <Pressable onPress={() => scrollToAyah(currentPlayingAyah)} style={styles.audioSettingsButton}>
-            <MaterialIcons
-              name="my-location"
-              size={20}
-              color={theme.mode === "dark" ? palette.textAccentMuted : palette.textMuted}
-            />
-          </Pressable>
-        </View>
-
-        {audioError ? <Text style={styles.audioErrorText}>{audioError}</Text> : null}
-        {isTimingProfileLoading ? (
-          <Text style={styles.audioTimingHint}>{t("quran.syncingAyahTiming")}</Text>
-        ) : null}
-      </View>
-
-      <FlatList
-        ref={flatListRef}
-        data={surahDetail.ayahs}
-        keyExtractor={(item) => `${item.number}`}
-        renderItem={renderAyah}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        initialNumToRender={10}
-        maxToRenderPerBatch={10}
-        removeClippedSubviews
-        onScrollToIndexFailed={() => undefined}
-        ListHeaderComponent={
-          bismillahVisible ? (
-            <View style={styles.bismillahWrap}>
-              <Text style={[styles.bismillahText, { color: palette.text }]}>
-                بِسْمِ ٱللَّٰهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ
-              </Text>
-            </View>
-          ) : null
-        }
-        ListFooterComponent={<View style={{ height: 120 }} />}
-      />
-
-      {resumeAyahForThisSurah ? (
-        <View pointerEvents="box-none" style={styles.fabOverlay}>
-          <Pressable
-            onPress={() => scrollToAyah(resumeAyahForThisSurah)}
-            style={({ pressed }) => [
-              styles.resumeFab,
-              { backgroundColor: palette.primary, opacity: pressed ? 0.92 : 1 },
-            ]}
-          >
-            <MaterialIcons name="auto-stories" size={20} color={palette.primaryDark} />
-            <Text style={[styles.resumeFabText, { color: palette.primaryDark }]}>{t("quran.resumeReading")}</Text>
-          </Pressable>
-        </View>
+          </Stack.Toolbar.View>
+        </Stack.Toolbar>
       ) : null}
-    </SafeAreaView>
+
+      <SafeAreaView style={[styles.safe, { backgroundColor: palette.bg }]} edges={isIOS ? ["left", "right"] : ["top"]}>
+        {!isIOS ? (
+          <View style={[styles.header, { backgroundColor: palette.headerBg, borderBottomColor: palette.border }]}>
+            <View style={styles.headerTopRow}>
+              <Pressable onPress={() => router.back()} style={styles.headerIcon}>
+                <MaterialIcons name="arrow-back" size={28} color={palette.text} />
+              </Pressable>
+
+              <View style={styles.headerTitleWrap}>
+                <Text style={[styles.headerTitle, { color: palette.text }]} numberOfLines={1}>
+                  {t("quran.surahPrefix", { name: surahDetail.surah.englishName })}
+                </Text>
+                <Text
+                  style={[
+                    styles.headerSubtitle,
+                    { color: palette.textMuted },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {surahDetail.surah.englishNameTranslation} • {surahDetail.surah.revelationType} • {t("quran.versesCount", { n: surahDetail.surah.numberOfAyahs })}
+                </Text>
+              </View>
+
+              <Pressable style={styles.headerIcon}>
+                <MaterialIcons name="more-vert" size={26} color={palette.text} />
+              </Pressable>
+            </View>
+
+            <View style={styles.audioRow}>
+              <Pressable
+                onPress={() => void togglePlayback()}
+                disabled={!audioTrack?.fullSurahUrl || isAudioLoading}
+                style={({ pressed }) => [
+                  styles.audioPlayButtonWrap,
+                  { backgroundColor: palette.primary, shadowColor: palette.primary },
+                  { opacity: pressed ? 0.9 : 1 },
+                  (!audioTrack?.fullSurahUrl || isAudioLoading) && styles.dimmed,
+                ]}
+              >
+                <MaterialIcons
+                  name={isAudioLoading ? "hourglass-empty" : isAudioPlaying ? "pause" : "play-arrow"}
+                  size={24}
+                  color={palette.primaryDark}
+                />
+              </Pressable>
+
+              <View style={styles.audioBarWrap}>
+                <Pressable
+                  onLayout={onTimelineLayout}
+                  onPress={(e) => void onTimelinePress(e.nativeEvent.locationX)}
+                  onStartShouldSetResponder={() => true}
+                  onMoveShouldSetResponder={() => true}
+                  onResponderGrant={(e) => onTimelineScrubStart(e.nativeEvent.locationX)}
+                  onResponderMove={(e) => onTimelineScrubMove(e.nativeEvent.locationX)}
+                  onResponderRelease={(e) => onTimelineScrubEnd(e.nativeEvent.locationX)}
+                  onResponderTerminate={() => setScrubProgress(null)}
+                  style={[
+                    styles.audioBarTrack,
+                    { backgroundColor: palette.timelineTrack },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.audioBarFill,
+                      {
+                        backgroundColor: palette.primary,
+                        width: `${displayedProgress * 100}%`,
+                      },
+                    ]}
+                  />
+                  <View
+                    pointerEvents="none"
+                    style={[
+                      styles.audioBarThumb,
+                      {
+                        backgroundColor: palette.primary,
+                        left: Math.max(0, Math.min(Math.max(0, timelineWidth - 12), timelineWidth * displayedProgress - 6)),
+                      },
+                    ]}
+                  />
+                </Pressable>
+                <View style={styles.audioTimeRow}>
+                  <Text style={[styles.audioTimeText, { color: palette.textMuted }]}>
+                    {formatMs(displayedPositionMillis)}
+                  </Text>
+                  <Text style={[styles.audioTimeText, { color: palette.textMuted }]}>
+                    {durationMillis > 0 ? formatMs(durationMillis) : "--:--"} • {t("quran.ayahLabel", { n: currentPlayingAyah ?? 1 })}/{surahDetail.ayahs.length}
+                  </Text>
+                </View>
+              </View>
+
+              <Pressable onPress={() => scrollToAyah(currentPlayingAyah)} style={styles.audioSettingsButton}>
+                <MaterialIcons
+                  name="my-location"
+                  size={20}
+                  color={palette.textMuted}
+                />
+              </Pressable>
+            </View>
+
+            {audioError ? <Text style={[styles.audioErrorText, { color: palette.danger }]}>{audioError}</Text> : null}
+            {isTimingProfileLoading ? (
+              <Text style={[styles.audioTimingHint, { color: palette.textMuted }]}>{t("quran.syncingAyahTiming")}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        <FlatList
+          ref={flatListRef}
+          data={surahDetail.ayahs}
+          keyExtractor={(item) => `${item.number}`}
+          renderItem={renderAyah}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          contentInsetAdjustmentBehavior={isIOS ? "automatic" : "never"}
+          automaticallyAdjustContentInsets={isIOS}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          removeClippedSubviews
+          onScrollToIndexFailed={() => undefined}
+          ListHeaderComponent={
+            bismillahVisible ? (
+              <View style={styles.bismillahWrap}>
+                <Text style={[styles.bismillahText, { color: palette.text }]}>
+                  بِسْمِ ٱللَّٰهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ
+                </Text>
+              </View>
+            ) : null
+          }
+          ListFooterComponent={<View style={{ height: isIOS ? iosToolbarReservedSpace : 120 }} />}
+        />
+
+        {resumeAyahForThisSurah ? (
+          <View pointerEvents="box-none" style={[styles.fabOverlay, isIOS ? { bottom: 88 } : null]}>
+            <Pressable
+              onPress={() => scrollToAyah(resumeAyahForThisSurah)}
+              style={({ pressed }) => [
+                styles.resumeFab,
+                { backgroundColor: palette.primary, shadowColor: palette.primary, opacity: pressed ? 0.92 : 1 },
+              ]}
+            >
+              <MaterialIcons name="auto-stories" size={20} color={palette.primaryDark} />
+              <Text style={[styles.resumeFabText, { color: palette.primaryDark }]}>{t("quran.resumeReading")}</Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </SafeAreaView>
+    </>
   );
 };
 
@@ -848,8 +956,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#B08968",
-    shadowColor: "#B08968",
     shadowOpacity: 0.2,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
@@ -857,6 +963,45 @@ const styles = StyleSheet.create({
   },
   dimmed: {
     opacity: 0.6,
+  },
+  toolbarPlayerWrap: {
+    width: 320,
+    maxWidth: 340,
+    minHeight: 54,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    backgroundColor: "transparent",
+  },
+  toolbarPlayButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  toolbarAudioMeta: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+  },
+  toolbarTitleText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  toolbarTrack: {
+    height: 5,
+  },
+  toolbarTimeText: {
+    fontSize: 10,
+    fontWeight: "500",
+  },
+  toolbarLocateButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
   audioBarWrap: {
     flex: 1,
@@ -871,6 +1016,17 @@ const styles = StyleSheet.create({
   audioBarFill: {
     height: "100%",
     borderRadius: 999,
+  },
+  audioBarThumb: {
+    position: "absolute",
+    top: -4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    shadowOpacity: 0.22,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
   audioTimeRow: {
     flexDirection: "row",
@@ -888,7 +1044,6 @@ const styles = StyleSheet.create({
   },
   audioErrorText: {
     marginTop: 8,
-    color: "#ef4444",
     fontSize: 11,
     fontWeight: "600",
   },
@@ -896,7 +1051,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 10,
     fontWeight: "500",
-    color: "#94a3b8",
   },
   listContent: {
     paddingBottom: 0,
@@ -968,7 +1122,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingVertical: 12,
     borderRadius: 999,
-    shadowColor: "#B08968",
     shadowOpacity: 0.25,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },

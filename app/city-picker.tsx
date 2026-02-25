@@ -10,8 +10,8 @@ import {
   View,
 } from "react-native";
 import { Stack, router } from "expo-router";
-import { BlurView } from "expo-blur";
 import { MaterialIcons } from "@expo/vector-icons";
+import type { SearchBarCommands } from "react-native-screens";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { fetchInitialCitySuggestions, searchCitiesWorldwide } from "../src/api/cityApi";
@@ -22,12 +22,36 @@ import type { CitySearchResult } from "../src/types/location";
 
 const PAGE_SIZE = 100;
 
+const hexToRgba = (hex: string, alpha: number) => {
+  const clampedAlpha = Math.max(0, Math.min(1, alpha));
+  const clean = hex.replace("#", "").trim();
+  if (!/^[0-9a-fA-F]{6}$/.test(clean)) {
+    return `rgba(0,0,0,${clampedAlpha})`;
+  }
+  const value = Number.parseInt(clean, 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return `rgba(${r},${g},${b},${clampedAlpha})`;
+};
+
 export default function CityPickerScreen() {
   const theme = useAppTheme();
-  const { t } = useI18n();
+  const { t, locale, isRTL } = useI18n();
   const insets = useSafeAreaInsets();
+  const isIOS = Platform.OS === "ios";
+  const iosMajorVersion = (() => {
+    if (!isIOS) return 0;
+    const raw = Platform.Version;
+    if (typeof raw === "number") return Math.floor(raw);
+    const parsed = Number.parseInt(String(raw).split(".")[0] ?? "0", 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  })();
+  const supportsToolbarSearchSlot = iosMajorVersion >= 26;
   const prayerTimes = useAppStore((s) => s.prayerTimes);
   const manualCity = useAppStore((s) => s.manualCity);
+  const setManualCity = useAppStore((s) => s.setManualCity);
+  const setCoordinates = useAppStore((s) => s.setCoordinates);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CitySearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -35,12 +59,30 @@ export default function CityPickerScreen() {
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  const searchBarRef = useRef<SearchBarCommands | null>(null);
   const hasUserScrolledRef = useRef(false);
 
   const activeLocationLabel = useMemo(() => {
     const tzCity = prayerTimes?.timezone?.split("/").pop()?.replace(/_/g, " ");
     return prayerTimes?.city?.city ?? manualCity?.city ?? tzCity ?? t("common.unknown");
   }, [manualCity?.city, prayerTimes?.city?.city, prayerTimes?.timezone, t]);
+
+  const headerLocationTime = useMemo(() => {
+    const timezone = prayerTimes?.timezone;
+    const rawTimeLabel = new Date(now).toLocaleTimeString(locale, {
+      timeZone: timezone,
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    const timeLabel = localizeClockLabel(rawTimeLabel, isRTL);
+    return isRTL ? `${timeLabel} - ${activeLocationLabel}` : `${activeLocationLabel} - ${timeLabel}`;
+  }, [activeLocationLabel, isRTL, locale, now, prayerTimes?.timezone]);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,48 +165,68 @@ export default function CityPickerScreen() {
         longitude: city.longitude,
       },
     });
-    router.back();
+    setQuery("");
+    searchBarRef.current?.clearText();
+    searchBarRef.current?.cancelSearch();
   };
-  const isIOS = Platform.OS === "ios";
-  const adaptiveTopPadding = 212;
+  const adaptiveTopPadding = isIOS ? 6 : insets.top + 8;
 
   return (
     <>
       <Stack.Screen
         options={{
-          title: t("cityPicker.title"),
           headerShown: true,
-          // Native iOS search bar + transparent headers in formSheet can mislayout RN scroll views.
-          // Keep native search and let UIKit own the header layout for reliable list positioning.
-          headerTransparent: false,
-          headerShadowVisible: false,
+          headerTransparent: true,
           headerStyle: { backgroundColor: "transparent" },
-          headerBackground: () =>
-            isIOS ? <BlurView intensity={35} tint={theme.mode === "dark" ? "dark" : "light"} style={{ flex: 1 }} /> : null,
-          headerTintColor: theme.colors.primary,
+          headerShadowVisible: false,
+          headerBackVisible: false,
+          headerTitle: headerLocationTime,
+          headerTitleAlign: "center",
           headerTitleStyle: {
-            color: theme.colors.text,
+            color: theme.colors.primary,
+            fontSize: 13,
             fontWeight: "700",
           },
-          headerLargeTitle: false,
-          headerSearchBarOptions:
-            isIOS
-              ? {
-                  placeholder: t("cityPicker.searchPlaceholder"),
-                  hideWhenScrolling: false,
-                  obscureBackground: false,
-                  autoCapitalize: "words",
-                  onChangeText: (event) => setQuery(event.nativeEvent.text),
-                  onCancelButtonPress: () => setQuery(""),
-                }
-              : undefined,
-          headerRight: () => (
-            <Pressable onPress={() => router.back()} hitSlop={8}>
-              <Text style={{ color: theme.colors.primary, fontWeight: "700", fontSize: 16 }}>{t("common.done")}</Text>
-            </Pressable>
-          ),
+          headerRight: () => null,
+          headerTintColor: theme.colors.primary,
         }}
       />
+      {isIOS ? (
+        <>
+          <Stack.Toolbar placement="left">
+            <Stack.Toolbar.Button icon="chevron.backward" onPress={() => router.back()} />
+          </Stack.Toolbar>
+
+          <Stack.Toolbar placement="right">
+            <Stack.Toolbar.Button
+              icon="location.fill"
+              accessibilityLabel="Use current location"
+              onPress={() => {
+                setManualCity(null);
+                setCoordinates(null);
+              }}
+            />
+          </Stack.Toolbar>
+
+          <Stack.SearchBar
+            ref={searchBarRef}
+            placeholder={t("cityPicker.searchPlaceholder")}
+            placement={supportsToolbarSearchSlot ? "automatic" : "stacked"}
+            allowToolbarIntegration={supportsToolbarSearchSlot}
+            hideWhenScrolling={false}
+            obscureBackground={false}
+            autoCapitalize="words"
+            onChangeText={(event) => setQuery(event.nativeEvent.text)}
+            onCancelButtonPress={() => setQuery("")}
+          />
+
+          {supportsToolbarSearchSlot ? (
+            <Stack.Toolbar placement="bottom">
+              <Stack.Toolbar.SearchBarSlot />
+            </Stack.Toolbar>
+          ) : null}
+        </>
+      ) : null}
 
       <View
         style={[
@@ -176,22 +238,18 @@ export default function CityPickerScreen() {
           },
         ]}
       >
-        {isIOS ? (
-          <BlurView intensity={45} tint={theme.mode === "dark" ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-        ) : null}
-
         <View style={styles.contentWrap}>
           {!isIOS ? (
             <View
               style={[
                 styles.inlineSearchWrap,
                 {
-                  backgroundColor:theme.colors.primary,
+                  backgroundColor: theme.colors.card,
                   borderColor: theme.colors.border,
                 },
               ]}
             >
-              <MaterialIcons name="search" size={18} color={theme.colors.textMuted} />
+              <MaterialIcons name="search" size={20} color={theme.colors.textMuted} />
               <TextInput
                 value={query}
                 onChangeText={setQuery}
@@ -206,7 +264,7 @@ export default function CityPickerScreen() {
             </View>
           ) : null}
 
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {error ? <Text style={[styles.errorText, { color: theme.colors.danger }]}>{error}</Text> : null}
 
           <FlatList
             data={results}
@@ -216,7 +274,7 @@ export default function CityPickerScreen() {
             nestedScrollEnabled
             contentInsetAdjustmentBehavior={isIOS ? "automatic" : "never"}
             automaticallyAdjustContentInsets={isIOS}
-            contentContainerStyle={[styles.listContent, results.length === 0 ? { flexGrow: 1 } : null]}
+            contentContainerStyle={styles.listContent}
             onEndReachedThreshold={0.12}
             onEndReached={() => void loadMore()}
             onScroll={(e) => {
@@ -236,49 +294,75 @@ export default function CityPickerScreen() {
                 </Text>
               ) : null
             }
-            renderItem={({ item }) => (
-              <View style={styles.cityRowWrap}>
-                <Pressable
-                  onPress={() => selectCity(item)}
-                  style={({ pressed }) => [
-                    styles.cityRow,
-                    {
-                      opacity: pressed ? 0.85 : 1,
-                      borderColor: theme.colors.primary,
-                      backgroundColor: (() => {
-                        const isSelected = prayerTimes?.city?.city === item.name || manualCity?.city === item.name;
-                        if (isSelected) {
-                          return theme.mode === "dark" ? "rgba(176,137,104,0.18)" : "rgba(176,137,104,0.14)";
-                        }
-                        return theme.mode === "dark" ? "rgba(44,34,26,0.78)" : "rgba(255,248,240,0.9)";
-                      })(),
-                    },
-                  ]}
-                >
-                  <View style={styles.cityRowLeft}>
-                    <View
-                      style={[
-                        styles.cityDot,
-                        {
-                          backgroundColor: theme.colors.primary,
-                        },
-                      ]}
-                    />
-                    <View style={styles.cityTextWrap}>
-                      <Text style={[styles.cityName, { color: theme.colors.text }]} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      <Text style={[styles.cityMeta, { color: theme.colors.textMuted }]} numberOfLines={1}>
-                        {[item.region, item.country].filter(Boolean).join(", ")}
-                      </Text>
+            renderItem={({ item }) => {
+              const isSelected = prayerTimes?.city?.city === item.name || manualCity?.city === item.name;
+              return (
+                <View style={styles.cityRowWrap}>
+                  <Pressable
+                    onPress={() => selectCity(item)}
+                    style={({ pressed }) => [
+                      styles.cityRow,
+                      {
+                        opacity: pressed ? 0.9 : 1,
+                        borderColor: isSelected ? theme.colors.primary : hexToRgba(theme.colors.border, 0.65),
+                        backgroundColor: isSelected ? hexToRgba(theme.colors.primary, 0.14) : hexToRgba(theme.colors.card, 0.92),
+                      },
+                    ]}
+                  >
+                    <View style={styles.cityRowLeft}>
+                      <View
+                        style={[
+                          styles.cityDotWrap,
+                          {
+                            borderColor: isSelected ? theme.colors.primary : hexToRgba(theme.colors.border, 0.8),
+                            backgroundColor: isSelected ? hexToRgba(theme.colors.primary, 0.12) : "transparent",
+                          },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.cityDot,
+                            {
+                              backgroundColor: theme.colors.primary,
+                              opacity: isSelected ? 1 : 0.7,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <View style={styles.cityTextWrap}>
+                        <Text style={[styles.cityName, { color: theme.colors.text }]} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <Text style={[styles.cityMeta, { color: theme.colors.textMuted }]} numberOfLines={1}>
+                          {[item.region, item.country].filter(Boolean).join(", ")}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                  <Text style={[styles.cityTimezone, { color: theme.colors.textMuted }]} numberOfLines={1}>
-                    {item.timezone?.split("/").pop()?.replace(/_/g, " ") ?? ""}
-                  </Text>
-                </Pressable>
-              </View>
-            )}
+
+                    <View style={styles.cityRight}>
+                      <Text
+                        style={[
+                          styles.cityTimezone,
+                          {
+                            color: isSelected ? theme.colors.text : theme.colors.textMuted,
+                            borderColor: hexToRgba(theme.colors.border, 0.8),
+                            backgroundColor: hexToRgba(theme.colors.backgroundAlt, 0.55),
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {item.timezone?.split("/").pop()?.replace(/_/g, " ") ?? ""}
+                      </Text>
+                      {isSelected ? (
+                        <MaterialIcons name="check-circle" size={18} color={theme.colors.primary} />
+                      ) : (
+                        <MaterialIcons name="chevron-right" size={18} color={hexToRgba(theme.colors.textMuted, 0.9)} />
+                      )}
+                    </View>
+                  </Pressable>
+                </View>
+              );
+            }}
             ListFooterComponent={
               isLoadingMore ? (
                 <View style={styles.footerLoading}>
@@ -306,18 +390,19 @@ export default function CityPickerScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
   },
   sheet: {
     flex: 1,
   },
   contentWrap: {
     flex: 1,
+    minHeight: 0,
     paddingHorizontal: 0,
   },
   inlineSearchWrap: {
-    minHeight: 44,
-    borderRadius: 12,
+    minHeight: 48,
+    borderRadius: 24,
     borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
@@ -331,62 +416,80 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   errorText: {
-    color: "#ef4444",
     fontSize: 12,
     fontWeight: "600",
     marginBottom: 8,
   },
   listContent: {
-    paddingBottom: 20,
-    paddingTop: 6,
-    gap: 8,
-    alignItems: "center",
+    flexGrow: 1,
+    paddingBottom: 24,
+    paddingTop: 8,
+    gap: 10,
+    alignItems: "stretch",
   },
   list: {
     flex: 1,
+    width: "100%",
   },
   cityRow: {
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    // marginLeft: 12,
-    gap:10,
-    width: "90%",
+    gap: 12,
+    width: "100%",
   },
   cityRowWrap: {
     width: "100%",
-    alignItems: "center",
   },
   cityRowLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     flex: 1,
   },
+  cityDotWrap: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   cityDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
   },
   cityTextWrap: {
     flex: 1,
   },
+  cityRight: {
+    alignItems: "flex-end",
+    justifyContent: "center",
+    gap: 7,
+    maxWidth: 118,
+  },
   cityName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "700",
   },
   cityMeta: {
-    marginTop: 2,
-    fontSize: 12,
+    marginTop: 3,
+    fontSize: 13,
   },
   cityTimezone: {
     fontSize: 11,
-    maxWidth: 100,
+    maxWidth: 118,
     textAlign: "right",
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    overflow: "hidden",
   },
   emptyText: {
     textAlign: "center",
@@ -406,7 +509,19 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 88 : 14,
+    top: Platform.OS === "ios" ? 60 : 14,
     right: 18,
   },
 });
+
+const toArabicDigits = (value: string): string =>
+  value.replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[Number(d)] ?? d);
+
+const localizeClockLabel = (value: string, isArabic: boolean): string => {
+  if (!isArabic) return value;
+  return toArabicDigits(
+    value
+      .replace(/\bAM\b/i, "ص")
+      .replace(/\bPM\b/i, "م"),
+  );
+};

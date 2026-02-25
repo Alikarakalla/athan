@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Stack, router } from "expo-router";
-import { MaterialIcons } from "@expo/vector-icons";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 
+import { NativeCityMenuButton, isNativeCityMenuAvailable } from "../../../src/components/NativeCityMenuButton";
 import { useI18n } from "../../../src/hooks/useI18n";
 import { useAppTheme } from "../../../src/hooks/useAppTheme";
 import { useAppStore } from "../../../src/store/appStore";
@@ -13,7 +13,9 @@ export default function HomeStackLayout() {
   const { t, locale, isRTL } = useI18n();
   const prayerTimes = useAppStore((s) => s.prayerTimes);
   const manualCity = useAppStore((s) => s.manualCity);
+  const setManualCity = useAppStore((s) => s.setManualCity);
   const [now, setNow] = useState(() => Date.now());
+  const hasNativeCityMenu = Platform.OS === "ios" && isNativeCityMenuAvailable();
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000);
@@ -47,27 +49,63 @@ export default function HomeStackLayout() {
         options={{
           title: t("tabs.home"),
           headerLeft: () => (
-            <Pressable
-              onPress={() => router.push("/city-picker")}
-              hitSlop={8}
-              style={({ pressed }) => [
-                styles.headerLeftContainer,
-                { opacity: pressed ? 0.85 : 1 },
-              ]}
-            >
-              <Text
-                style={{
-                  color: theme.colors.primary,
-                  fontSize: 13,
-                  fontWeight: "700",
-                  writingDirection: isRTL ? "rtl" : "ltr",
+            hasNativeCityMenu ? (
+              <NativeCityMenuButton
+                style={styles.headerLeftNativeMenu}
+                title={
+                  isRTL
+                    ? `${headerMeta.timeLabel} - ${headerMeta.locationName}`
+                    : `${headerMeta.locationName} - ${headerMeta.timeLabel}`
+                }
+                titleColor={theme.colors.primary}
+                pillBackgroundColor={theme.colors.card}
+                pillBorderColor={theme.colors.border}
+                items={[
+                  {
+                    id: "search",
+                    title: isRTL ? "بحث عن مدينة" : "Search Cities",
+                    sf: "magnifyingglass",
+                  },
+                  {
+                    id: "auto",
+                    title: isRTL ? "استخدام الموقع الحالي" : "Use Current Location",
+                    sf: "location",
+                  },
+                ]}
+                onSelectAction={(event) => {
+                  const actionId = event.nativeEvent?.id;
+                  if (actionId === "search") {
+                    router.push("/city-picker");
+                    return;
+                  }
+                  if (actionId === "auto") {
+                    setManualCity(null);
+                  }
                 }}
+              />
+            ) : (
+              <Pressable
+                onPress={() => router.push("/city-picker")}
+                hitSlop={8}
+                style={({ pressed }) => [
+                  styles.headerLeftContainer,
+                  { opacity: pressed ? 0.85 : 1 },
+                ]}
               >
-                {isRTL
-                  ? `${headerMeta.timeLabel} - ${headerMeta.locationName}`
-                  : `${headerMeta.locationName} - ${headerMeta.timeLabel}`}
-              </Text>
-            </Pressable>
+                <Text
+                  style={{
+                    color: theme.colors.primary,
+                    fontSize: 13,
+                    fontWeight: "700",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}
+                >
+                  {isRTL
+                    ? `${headerMeta.timeLabel} - ${headerMeta.locationName}`
+                    : `${headerMeta.locationName} - ${headerMeta.timeLabel}`}
+                </Text>
+              </Pressable>
+            )
           ),
           headerRight: () => (
             <Pressable
@@ -101,6 +139,13 @@ const styles = StyleSheet.create({
     // paddingBottom: 4,
     flexDirection: 'column',
     justifyContent: 'center',
+  },
+  headerLeftNativeMenu: {
+    marginLeft: 16,
+    marginRight: 12,
+    height: 34,
+    minWidth: 170,
+    maxWidth: 300,
   },
 
   headerRightContainer: {

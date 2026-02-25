@@ -1,7 +1,6 @@
 import "react-native-gesture-handler";
 
 import { useEffect } from "react";
-import { Platform } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -15,6 +14,19 @@ import {
 
 configureNotificationBehavior();
 
+const getStatusBarStyle = (background: string): "light" | "dark" => {
+  const clean = background.replace("#", "").trim();
+  if (!/^[0-9a-fA-F]{6}$/.test(clean)) {
+    return "light";
+  }
+  const value = Number.parseInt(clean, 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return luminance > 0.62 ? "dark" : "light";
+};
+
 export default function RootLayout() {
   const theme = useAppTheme();
 
@@ -25,21 +37,21 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <StatusBar style={theme.mode === "dark" ? "light" : "dark"} />
+        <StatusBar style={getStatusBarStyle(theme.colors.background)} />
         <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" />
+          <Stack.Screen
+            name="(tabs)"
+            options={{
+              headerShown: false,
+              headerTitle: "",
+            }}
+          />
           <Stack.Screen
             name="city-picker"
             options={{
               headerShown: true,
-              headerTransparent: true,
-              headerShadowVisible: false,
-              headerStyle: {
-                backgroundColor: "transparent",
-              },
-              headerBackground: () => null,
-              presentation: Platform.OS === "ios" ? "formSheet" : "modal",
-              animation: Platform.OS === "ios" ? "default" : "slide_from_bottom",
+              presentation: "card",
+              animation: "default",
               contentStyle: {
                 backgroundColor: theme.colors.background,
               },

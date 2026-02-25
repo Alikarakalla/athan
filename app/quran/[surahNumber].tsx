@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 
 import { SurahDetailScreen } from "../../src/screens/SurahDetailScreen";
 
@@ -15,9 +15,7 @@ export default function SurahDetailStandaloneRoute() {
 
   return (
     <>
-      <Stack.Screen options={{ headerShown: false, title: "Surah" }} />
       <SurahDetailScreen surahNumber={surahNumber} initialAyahNumber={initialAyahNumber} />
     </>
   );
 }
-

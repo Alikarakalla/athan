@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 
+import { useAppTheme } from "../hooks/useAppTheme";
 import { useI18n } from "../hooks/useI18n";
 import { usePrayerTimes } from "../hooks/usePrayerTimes";
 import { useAppStore } from "../store/appStore";
@@ -22,34 +23,33 @@ type PrayerIconName =
   | "nights-stay"
   | "bedtime";
 
-const DESIGN = {
-  light: {
-    bg: "#f6f8f7",
-    text: "#0f172a",
-    textMuted: "#64748b",
-    headerBorder: "#e5e7eb",
-    card: "#ffffff",
-    cardBorder: "#f0f2f2",
-    rowHover: "#f8fafc",
-    primary: "#B08968",
-    primaryTextDark: "#2F241A",
-    surfaceDark: "#3A2D22",
-    surfaceDarker: "#2F241A",
-  },
-  dark: {
-    bg: "#1A1511",
-    text: "#f8fafc",
-    textMuted: "#94a3b8",
-    headerBorder: "rgba(255,255,255,0.06)",
-    card: "#2A2119",
-    cardBorder: "rgba(255,255,255,0.06)",
-    rowHover: "#241C15",
-    primary: "#D0B089",
-    primaryTextDark: "#2F241A",
-    surfaceDark: "#2E241B",
-    surfaceDarker: "#241C15",
-  },
-} as const;
+type HomePalette = {
+  bg: string;
+  text: string;
+  textMuted: string;
+  card: string;
+  cardBorder: string;
+  rowHover: string;
+  primary: string;
+  primaryTextDark: string;
+  surfaceDark: string;
+  surfaceDarker: string;
+  border: string;
+  danger: string;
+};
+
+const hexToRgba = (hex: string, alpha: number) => {
+  const clampedAlpha = Math.max(0, Math.min(1, alpha));
+  const clean = hex.replace("#", "").trim();
+  if (!/^[0-9a-fA-F]{6}$/.test(clean)) {
+    return `rgba(0,0,0,${clampedAlpha})`;
+  }
+  const value = Number.parseInt(clean, 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return `rgba(${r},${g},${b},${clampedAlpha})`;
+};
 
 const PRAYER_ICON_MAP: Record<string, PrayerIconName> = {
   Fajr: "wb-twilight",
@@ -189,8 +189,7 @@ const getNextPrayerProgress = (
 };
 
 type HeroGaugeProps = {
-  palette: (typeof DESIGN)[keyof typeof DESIGN];
-  isDark: boolean;
+  palette: HomePalette;
   nextPrayerName: string;
   nextPrayerTime: string;
   countdownLabel: string;
@@ -204,7 +203,6 @@ type HeroGaugeProps = {
 
 const HeroPrayerGauge = ({
   palette,
-  isDark,
   nextPrayerName,
   nextPrayerTime,
   countdownLabel,
@@ -225,8 +223,8 @@ const HeroPrayerGauge = ({
   const dotX = center + Math.cos(activeRad) * radius;
   const dotY = center + Math.sin(activeRad) * radius;
   const progressColor = palette.primary;
-  const dimArcColor = isNightTheme ? "rgba(139,218,255,0.14)" : "rgba(255,255,255,0.10)";
-  const dotGlowColor = isNightTheme ? "rgba(139,218,255,0.30)" : "rgba(176,137,104,0.24)";
+  const dimArcColor = hexToRgba(palette.primary, isNightTheme ? 0.22 : 0.14);
+  const dotGlowColor = hexToRgba(palette.primary, isNightTheme ? 0.36 : 0.24);
 
   return (
     <View
@@ -235,19 +233,27 @@ const HeroPrayerGauge = ({
         styles.heroGaugeCard,
         {
           backgroundColor: palette.surfaceDark,
-          borderColor: "rgba(255,255,255,0.06)",
+          borderColor: palette.cardBorder,
         },
       ]}
     >
       <View style={styles.heroNoiseLayer} />
-      <View style={styles.heroGlowA} />
-      <View style={styles.heroGlowB} />
-      <View style={[styles.ramadanStar, styles.ramadanStarA, isNightTheme && styles.ramadanStarNight]} />
-      <View style={[styles.ramadanStar, styles.ramadanStarB, isNightTheme && styles.ramadanStarNight]} />
-      <View style={[styles.ramadanStar, styles.ramadanStarC, isNightTheme && styles.ramadanStarNight]} />
+      <View style={[styles.heroGlowA, { backgroundColor: hexToRgba(palette.primary, 0.12) }]} />
+      <View style={[styles.heroGlowB, { backgroundColor: hexToRgba(palette.primary, 0.08) }]} />
+      <View style={[styles.ramadanStar, styles.ramadanStarA, { backgroundColor: hexToRgba(palette.primary, 0.45) }]} />
+      <View style={[styles.ramadanStar, styles.ramadanStarB, { backgroundColor: hexToRgba(palette.primary, 0.45) }]} />
+      <View style={[styles.ramadanStar, styles.ramadanStarC, { backgroundColor: hexToRgba(palette.primary, 0.45) }]} />
       <View style={styles.featureTopRow}>
         <View style={styles.topPillRow}>
-          <View style={styles.nextPill}>
+          <View
+            style={[
+              styles.nextPill,
+              {
+                backgroundColor: hexToRgba(palette.primary, 0.16),
+                borderColor: hexToRgba(palette.primary, 0.2),
+              },
+            ]}
+          >
             <Text style={[styles.nextPillText, { color: palette.primary }]}>{nextPrayerPillLabel}</Text>
           </View>
         </View>
@@ -255,7 +261,7 @@ const HeroPrayerGauge = ({
           <MaterialIcons
             name={notificationsEnabled ? "notifications-active" : "notifications-off"}
             size={22}
-            color="rgba(255,255,255,0.8)"
+            color={palette.textMuted}
           />
         </Pressable>
       </View>
@@ -282,8 +288,11 @@ const HeroPrayerGauge = ({
                         transform: [{ rotate: `${angle + 90}deg` }],
                         backgroundColor: isFilled ? progressColor : dimArcColor,
                         opacity: isFilled ? 1 : 0.9,
+                        shadowColor: isFilled ? palette.primary : "transparent",
+                        shadowOpacity: isFilled ? 0.3 : 0,
+                        shadowRadius: isFilled ? 6 : 0,
+                        shadowOffset: { width: 0, height: 0 },
                       },
-                      isFilled && styles.gaugeSegmentActive,
                     ]}
                   />
                 );
@@ -306,7 +315,7 @@ const HeroPrayerGauge = ({
                     left: dotX - 4.5,
                     top: dotY - 4.5,
                     backgroundColor: progressColor,
-                    borderColor: isDark ? palette.surfaceDark : "#0f172a",
+                    borderColor: palette.border,
                   },
                 ]}
               />
@@ -314,18 +323,18 @@ const HeroPrayerGauge = ({
           </View>
 
           <View style={styles.gaugeCenterContent}>
-            <Text style={styles.featurePrayerName}>{nextPrayerName}</Text>
-            <Text style={[styles.gaugeBigTime, { color: "#FFFFFF" }]}>{nextPrayerTime}</Text>
-            <Text style={styles.gaugeCountdownText}>
-              {nextPrayerRelative} <Text style={styles.gaugeCountdownCode}>({countdownLabel})</Text>
+            <Text style={[styles.featurePrayerName, { color: palette.text }]}>{nextPrayerName}</Text>
+            <Text style={[styles.gaugeBigTime, { color: palette.text }]}>{nextPrayerTime}</Text>
+            <Text style={[styles.gaugeCountdownText, { color: palette.textMuted }]}>
+              {nextPrayerRelative} <Text style={[styles.gaugeCountdownCode, { color: palette.textMuted }]}>({countdownLabel})</Text>
             </Text>
           </View>
 
           <View style={styles.arcEdgeLabels} pointerEvents="none">
-            <Text numberOfLines={1} style={styles.arcEdgeLabelText}>
+            <Text numberOfLines={1} style={[styles.arcEdgeLabelText, { color: palette.textMuted }]}>
               {previousPrayerName}
             </Text>
-            <Text numberOfLines={1} style={[styles.arcEdgeLabelText, styles.arcEdgeLabelTextRight]}>
+            <Text numberOfLines={1} style={[styles.arcEdgeLabelText, styles.arcEdgeLabelTextRight, { color: palette.textMuted }]}>
               {nextPrayerName}
             </Text>
           </View>
@@ -337,17 +346,29 @@ const HeroPrayerGauge = ({
 };
 
 export const HomeScreen = () => {
+  const theme = useAppTheme();
   const prayerTimes = useAppStore((s) => s.prayerTimes);
   const manualCity = useAppStore((s) => s.manualCity);
   const notificationsEnabled = useAppStore((s) => s.notificationsEnabled);
   const prayerNotificationPrefs = useAppStore((s) => s.prayerNotificationPrefs);
   const togglePrayerNotificationEnabled = useAppStore((s) => s.togglePrayerNotificationEnabled);
-  const themeMode = useAppStore((s) => s.themeMode);
   const { isLoading, error, nextPrayer, countdownLabel, refreshPrayerTimes } = usePrayerTimes();
   const { t, prayerName, locale, isRTL } = useI18n();
 
-  const palette = themeMode === "light" ? DESIGN.light : DESIGN.dark;
-  const isDark = themeMode !== "light";
+  const palette: HomePalette = {
+    bg: theme.colors.background,
+    text: theme.colors.text,
+    textMuted: theme.colors.textMuted,
+    card: theme.colors.card,
+    cardBorder: theme.colors.border,
+    rowHover: theme.colors.backgroundAlt,
+    primary: theme.colors.primary,
+    primaryTextDark: theme.colors.background,
+    surfaceDark: theme.colors.card,
+    surfaceDarker: theme.colors.backgroundAlt,
+    border: theme.colors.border,
+    danger: theme.colors.danger,
+  };
   const nowTs = Date.now();
 
   const today = useMemo(() => new Date(), [prayerTimes?.dateKey, countdownLabel]);
@@ -373,7 +394,7 @@ export const HomeScreen = () => {
   return (
     <SafeAreaView
       style={[styles.safe, { backgroundColor: palette.bg }]}
-      edges={["left", "right"]}
+      edges={["top", "left", "right"]}
     >
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -390,7 +411,6 @@ export const HomeScreen = () => {
           <View style={styles.featureWrap}>
             <HeroPrayerGauge
               palette={palette}
-              isDark={isDark}
               nextPrayerName={nextPrayerName}
               nextPrayerTime={nextPrayerTime}
               countdownLabel={localizeClockLabel(countdownLabel, isRTL)}
@@ -408,7 +428,7 @@ export const HomeScreen = () => {
               <Text style={[styles.dateTitle, { color: palette.text }]}>{gregorianDate}</Text>
               <Text style={[styles.dateSub, { color: palette.textMuted }]}>{islamicDate}</Text>
             </View>
-            <Pressable style={styles.headerIconBtn}>
+            <Pressable style={[styles.headerIconBtn, { backgroundColor: palette.rowHover }]}>
               <MaterialIcons name="calendar-month" size={22} color={palette.textMuted} />
             </Pressable>
           </View>
@@ -418,12 +438,12 @@ export const HomeScreen = () => {
               style={[
                 styles.errorBox,
                 {
-                  backgroundColor: isDark ? "rgba(239,68,68,0.08)" : "#fff1f2",
-                  borderColor: isDark ? "rgba(239,68,68,0.2)" : "#fecdd3",
+                  backgroundColor: hexToRgba(palette.danger, 0.12),
+                  borderColor: hexToRgba(palette.danger, 0.4),
                 },
               ]}
             >
-              <Text style={[styles.errorTitle, isRTL && styles.rtlText]}>{t("prayer.errorTitle")}</Text>
+              <Text style={[styles.errorTitle, { color: palette.danger }, isRTL && styles.rtlText]}>{t("prayer.errorTitle")}</Text>
               <Text style={[styles.errorText, { color: palette.textMuted }]}>{error}</Text>
             </View>
           )}
@@ -443,10 +463,14 @@ export const HomeScreen = () => {
                     styles.prayerItem,
                     {
                       backgroundColor: palette.card,
-                      borderColor: isNext ? "rgba(176,137,104,0.30)" : palette.cardBorder,
+                      borderColor: isNext ? hexToRgba(palette.primary, 0.35) : palette.cardBorder,
                       opacity: isPassed ? 0.7 : 1,
                     },
                     isNext && styles.prayerItemActive,
+                    isNext && {
+                      borderLeftColor: palette.primary,
+                      shadowColor: palette.primary,
+                    },
                   ]}
                 >
                   <View style={styles.prayerLeft}>
@@ -455,8 +479,8 @@ export const HomeScreen = () => {
                         styles.prayerIconWrap,
                         {
                           backgroundColor: isNext
-                            ? (isDark ? "rgba(176,137,104,0.16)" : "rgba(176,137,104,0.10)")
-                            : (isDark ? "rgba(255,255,255,0.05)" : "#f1f5f9"),
+                            ? hexToRgba(palette.primary, 0.14)
+                            : palette.rowHover,
                         },
                       ]}
                     >
@@ -469,7 +493,7 @@ export const HomeScreen = () => {
                     <Text
                       style={[
                         styles.prayerName,
-                        { color: palette.text },
+                        { color: isNext ? palette.primary : palette.text },
                         isNext && styles.prayerNameActive,
                       ]}
                     >
@@ -481,7 +505,7 @@ export const HomeScreen = () => {
                     <Text
                       style={[
                         styles.prayerTime,
-                        { color: palette.text },
+                        { color: isNext ? palette.primary : palette.text },
                         isNext && styles.prayerTimeActive,
                       ]}
                     >
@@ -855,8 +879,8 @@ const styles = StyleSheet.create({
   },
   prayerItemActive: {
     borderLeftWidth: 4,
-    borderLeftColor: "#B08968",
-    shadowColor: "#B08968",
+    borderLeftColor: "transparent",
+    shadowColor: "transparent",
     shadowOpacity: 0.12,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },

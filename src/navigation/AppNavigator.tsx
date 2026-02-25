@@ -9,7 +9,7 @@ export const AppNavigator = () => {
 
   const navigationTheme = useMemo<NavigationTheme>(
     () => ({
-      dark: theme.mode === "dark",
+      dark: false,
       colors: {
         primary: theme.colors.primary,
         background: theme.colors.background,
@@ -34,4 +34,3 @@ export const AppNavigator = () => {
     </NavigationContainer>
   );
 };
-

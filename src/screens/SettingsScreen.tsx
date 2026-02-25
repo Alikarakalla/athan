@@ -1,11 +1,11 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import {
-  Audio,
-  InterruptionModeAndroid,
-  InterruptionModeIOS,
-  type AVPlaybackStatus,
-} from "expo-av";
+  createAudioPlayer,
+  setAudioModeAsync,
+  type AudioPlayer as ExpoAudioPlayer,
+  type AudioStatus,
+} from "expo-audio";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 
@@ -14,50 +14,31 @@ import { clearQuranCache, fetchQuranReciterPreviewUrl, fetchQuranReciters } from
 import { ScreenContainer } from "../components/ScreenContainer";
 import { useI18n } from "../hooks/useI18n";
 import { useAppTheme } from "../hooks/useAppTheme";
-import { isNativeUIColorPickerAvailable, isNativeUIColorPickerSupported, presentNativeUIColorPicker } from "../services/nativeColorPickerService";
+import {
+  isNativeUIColorPickerSupported,
+  presentNativeUIColorPicker,
+} from "../services/nativeColorPickerService";
 import { cancelAthanNotifications, requestNotificationPermission } from "../services/notificationService";
 import { useAppStore } from "../store/appStore";
 import type { QuranReciter } from "../types/quran";
 import type { AthanSoundKey, ThemeColorKey } from "../types/settings";
 import { ATHAN_SOUND_OPTIONS, DEFAULT_MANUAL_COUNTRY, NOTIFICATION_PRAYERS } from "../utils/constants";
-import { darkTheme, lightTheme } from "../utils/theme";
+import { lightTheme } from "../utils/theme";
 
 type SettingsSheetKey = "appearance" | "prayer" | "quranVoice" | "general" | "location" | "storage";
 
-const THEME_COLOR_KEYS: ThemeColorKey[] = [
-  "primary",
-  "accent",
-  "background",
-  "backgroundAlt",
-  "card",
-  "border",
-  "text",
-  "textMuted",
-  "success",
-  "danger",
+const THEME_COLOR_OPTIONS: ReadonlyArray<{ key: ThemeColorKey; en: string; ar: string }> = [
+  { key: "primary", en: "Primary", ar: "الأساسي" },
+  { key: "accent", en: "Accent", ar: "المساعد" },
+  { key: "background", en: "Background", ar: "الخلفية" },
+  { key: "backgroundAlt", en: "Alt Background", ar: "خلفية ثانوية" },
+  { key: "card", en: "Card", ar: "البطاقات" },
+  { key: "border", en: "Border", ar: "الحدود" },
+  { key: "text", en: "Text", ar: "النص" },
+  { key: "textMuted", en: "Muted Text", ar: "نص ثانوي" },
+  { key: "success", en: "Success", ar: "نجاح" },
+  { key: "danger", en: "Danger", ar: "خطر" },
 ];
-
-const COLOR_GRID = [
-  "#B08968", "#9C7A52", "#D0B089", "#EADBC8", "#7F5539", "#6B4F3A",
-  "#1F1A12", "#2A2119", "#FFFDF7", "#F4F0E5", "#EFE7D1", "#D8CFB5",
-  "#CBA67A", "#D6B489", "#A97142", "#8B5E34", "#6E6454", "#C0B39F",
-  "#B14A42", "#F27C74", "#8B6A46", "#A3B18A", "#588157", "#3A5A40",
-  "#5E548E", "#9F86C0", "#4361EE", "#4895EF", "#4CC9F0", "#7209B7",
-  "#FFB703", "#FB8500", "#E63946", "#2A9D8F", "#219EBC", "#264653",
-];
-
-const THEME_COLOR_LABELS: Record<ThemeColorKey, { en: string; ar: string }> = {
-  background: { en: "Background", ar: "الخلفية" },
-  backgroundAlt: { en: "Alt Background", ar: "خلفية ثانوية" },
-  card: { en: "Card", ar: "البطاقات" },
-  border: { en: "Border", ar: "الحدود" },
-  text: { en: "Text", ar: "النص" },
-  textMuted: { en: "Muted Text", ar: "النص الثانوي" },
-  primary: { en: "Primary", ar: "اللون الأساسي" },
-  accent: { en: "Accent", ar: "اللون المساعد" },
-  danger: { en: "Danger", ar: "الخطر" },
-  success: { en: "Success", ar: "النجاح" },
-};
 
 type HubRowProps = {
   theme: ReturnType<typeof useAppTheme>;
@@ -97,7 +78,6 @@ const Divider = ({ themeBorder, style }: { themeBorder: string; style?: object }
 export const SettingsScreen = () => {
   const theme = useAppTheme();
   const { t, language } = useI18n();
-  const themeMode = useAppStore((s) => s.themeMode);
   const themeCms = useAppStore((s) => s.themeCms);
   const setLanguage = useAppStore((s) => s.setLanguage);
   const notificationsEnabled = useAppStore((s) => s.notificationsEnabled);
@@ -107,7 +87,6 @@ export const SettingsScreen = () => {
   const manualCity = useAppStore((s) => s.manualCity);
   const quranReciterId = useAppStore((s) => s.quranReciterId);
   const quranReciterName = useAppStore((s) => s.quranReciterName);
-  const setThemeMode = useAppStore((s) => s.setThemeMode);
   const setThemeColor = useAppStore((s) => s.setThemeColor);
   const resetThemeCms = useAppStore((s) => s.resetThemeCms);
   const setNotificationsEnabled = useAppStore((s) => s.setNotificationsEnabled);
@@ -134,12 +113,10 @@ export const SettingsScreen = () => {
   const [athanPreviewPlayingKey, setAthanPreviewPlayingKey] = useState<AthanSoundKey | null>(null);
   const [athanPreviewError, setAthanPreviewError] = useState<string | null>(null);
   const [activeSheet, setActiveSheet] = useState<SettingsSheetKey | null>(null);
-  const [showThemeCms, setShowThemeCms] = useState(false);
-  const [cmsTargetMode, setCmsTargetMode] = useState<"light" | "dark">("light");
-  const [cmsPickerTab, setCmsPickerTab] = useState<"grid" | "spectrum" | "sliders">("grid");
-  const [selectedThemeColorKey, setSelectedThemeColorKey] = useState<ThemeColorKey>("primary");
-  const [themeHexInput, setThemeHexInput] = useState("");
-  const previewSoundRef = useRef<Audio.Sound | null>(null);
+  const [cmsTargetKey, setCmsTargetKey] = useState<ThemeColorKey>("primary");
+  const [showThemeColorModal, setShowThemeColorModal] = useState(false);
+  const cmsPickerInFlightRef = useRef(false);
+  const previewSoundRef = useRef<ExpoAudioPlayer | null>(null);
   const previewUrlCacheRef = useRef<Record<number, string>>({});
 
   useEffect(() => {
@@ -170,7 +147,7 @@ export const SettingsScreen = () => {
     const sound = previewSoundRef.current;
     previewSoundRef.current = null;
     try {
-      await sound.unloadAsync();
+      sound.remove();
     } catch {
       // ignore
     }
@@ -186,26 +163,23 @@ export const SettingsScreen = () => {
     setPreviewError(null);
     setPreviewLoadingId(reciter.id);
     try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-        interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-        shouldDuckAndroid: true,
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+        shouldPlayInBackground: false,
+        interruptionMode: 'doNotMix',
       });
 
       const current = previewSoundRef.current;
       if (current && previewPlayingId === reciter.id) {
-        const status = await current.getStatusAsync();
-        if (status.isLoaded && status.isPlaying) {
-          await current.pauseAsync();
+        if (current.isLoaded && current.playing) {
+          current.pause();
           setPreviewPlayingId(null);
           setPreviewLoadingId(null);
           return;
         }
-        if (status.isLoaded && !status.isPlaying) {
-          await current.playAsync();
+        if (current.isLoaded && !current.playing) {
+          current.play();
           setPreviewPlayingId(reciter.id);
           setPreviewLoadingId(null);
           return;
@@ -221,18 +195,16 @@ export const SettingsScreen = () => {
         (await fetchQuranReciterPreviewUrl(reciter.id));
       previewUrlCacheRef.current[reciter.id] = uri;
 
-      const { sound } = await Audio.Sound.createAsync(
-        { uri },
-        { shouldPlay: true, progressUpdateIntervalMillis: 250 },
-        (status: AVPlaybackStatus) => {
-          if (!status.isLoaded) return;
-          if (status.didJustFinish) {
-            setPreviewPlayingId(null);
-          } else {
-            setPreviewPlayingId(status.isPlaying ? reciter.id : null);
-          }
-        },
-      );
+      const sound = createAudioPlayer(uri, { updateInterval: 250 });
+      sound.addListener('playbackStatusUpdate', (status: AudioStatus) => {
+        if (!status.isLoaded) return;
+        if (status.didJustFinish) {
+          setPreviewPlayingId(null);
+        } else {
+          setPreviewPlayingId(status.playing ? reciter.id : null);
+        }
+      });
+      sound.play();
       previewSoundRef.current = sound;
       setPreviewPlayingId(reciter.id);
     } catch (err) {
@@ -261,26 +233,23 @@ export const SettingsScreen = () => {
     setAthanPreviewError(null);
     setAthanPreviewLoadingKey(key);
     try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-        interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-        shouldDuckAndroid: true,
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+        shouldPlayInBackground: false,
+        interruptionMode: 'doNotMix',
       });
 
       const current = previewSoundRef.current;
       if (current && athanPreviewPlayingKey === key) {
-        const status = await current.getStatusAsync();
-        if (status.isLoaded && status.isPlaying) {
-          await current.pauseAsync();
+        if (current.isLoaded && current.playing) {
+          current.pause();
           setAthanPreviewPlayingKey(null);
           setAthanPreviewLoadingKey(null);
           return;
         }
-        if (status.isLoaded && !status.isPlaying) {
-          await current.playAsync();
+        if (current.isLoaded && !current.playing) {
+          current.play();
           setAthanPreviewPlayingKey(key);
           setPreviewPlayingId(null);
           setAthanPreviewLoadingKey(null);
@@ -294,18 +263,16 @@ export const SettingsScreen = () => {
 
       const uri = await getAthanPreviewUri(key, filename, previewUrl);
 
-      const { sound } = await Audio.Sound.createAsync(
-        { uri },
-        { shouldPlay: true, progressUpdateIntervalMillis: 250 },
-        (status: AVPlaybackStatus) => {
-          if (!status.isLoaded) return;
-          if (status.didJustFinish) {
-            setAthanPreviewPlayingKey(null);
-          } else {
-            setAthanPreviewPlayingKey(status.isPlaying ? key : null);
-          }
-        },
-      );
+      const sound = createAudioPlayer(uri, { updateInterval: 250 });
+      sound.addListener('playbackStatusUpdate', (status: AudioStatus) => {
+        if (!status.isLoaded) return;
+        if (status.didJustFinish) {
+          setAthanPreviewPlayingKey(null);
+        } else {
+          setAthanPreviewPlayingKey(status.playing ? key : null);
+        }
+      });
+      sound.play();
       previewSoundRef.current = sound;
       setAthanPreviewPlayingKey(key);
     } catch (err) {
@@ -385,14 +352,6 @@ export const SettingsScreen = () => {
     : isArabic
       ? "?????? (GPS)"
       : "Automatic (GPS)";
-  const appearanceSummary = `${themeMode === "system"
-    ? t("settings.systemTheme")
-    : themeMode === "dark"
-      ? t("settings.darkMode")
-      : isArabic
-        ? "????"
-        : "Light"} • ${language === "ar" ? t("settings.langArabic") : t("settings.langEnglish")}`;
-  const timeSummary = timeFormat === "24h" ? t("settings.time24") : t("settings.time12");
   const methodSummary = isArabic ? "??????? (?????? ????)" : "Ja'fari (Ithna-Ashari)";
   const modalTitleMap: Record<SettingsSheetKey, string> = {
     appearance: t("settings.appearance"),
@@ -410,17 +369,74 @@ export const SettingsScreen = () => {
     setActiveSheet(sheet);
   };
 
-  const cmsBaseTheme = cmsTargetMode === "dark" ? darkTheme : lightTheme;
-  const cmsActiveColor = themeCms[cmsTargetMode][selectedThemeColorKey] ?? cmsBaseTheme.colors[selectedThemeColorKey];
+  const selectedThemeColorLabel =
+    THEME_COLOR_OPTIONS.find((entry) => entry.key === cmsTargetKey)?.[isArabic ? "ar" : "en"] ??
+    (isArabic ? "الأساسي" : "Primary");
 
-  useEffect(() => {
-    setThemeHexInput(cmsActiveColor);
-  }, [cmsActiveColor]);
-
-  const applyCmsColor = (hex: string) => {
+  const applyCmsColor = (hex: string, target: { key?: ThemeColorKey } = {}) => {
     const normalized = hex.trim().startsWith("#") ? hex.trim() : `#${hex.trim()}`;
     if (!/^#[0-9a-fA-F]{6}$/.test(normalized)) return;
-    setThemeColor(cmsTargetMode, selectedThemeColorKey, normalized.toUpperCase());
+    setThemeColor("light", target.key ?? cmsTargetKey, normalized.toUpperCase());
+  };
+
+  const openCmsNativePicker = async (
+    options: {
+      initialHex?: string;
+      showUnavailableAlert?: boolean;
+      targetKey?: ThemeColorKey;
+    } = {},
+  ) => {
+    if (cmsPickerInFlightRef.current) {
+      return false;
+    }
+    cmsPickerInFlightRef.current = true;
+    const {
+      initialHex,
+      showUnavailableAlert = false,
+      targetKey = cmsTargetKey,
+    } = options;
+    if (!isNativeUIColorPickerSupported()) {
+      if (showUnavailableAlert) {
+        Alert.alert(
+          isArabic ? "متاح على iOS فقط" : "iOS Only",
+          isArabic
+            ? "هذا الخيار يحتاج iPhone + بناء iOS."
+            : "This option requires an iPhone and an iOS build.",
+        );
+      }
+      cmsPickerInFlightRef.current = false;
+      return false;
+    }
+    try {
+      const initialColor =
+        initialHex ??
+        themeCms.light[targetKey] ??
+        lightTheme.colors[targetKey];
+      const result = await presentNativeUIColorPicker({
+        initialHex: initialColor,
+        supportsAlpha: false,
+        title: isArabic ? "اختر اللون" : "Pick Color",
+      });
+      applyCmsColor(result.hex, { key: targetKey });
+      return true;
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : (isArabic ? "فشل فتح منتقي الألوان" : "Failed to open color picker");
+      const isBusy = /already open|picker_busy/i.test(message);
+      if (isBusy) {
+        // Ignore duplicate-open races (double tap / rapid taps).
+        return false;
+      }
+      Alert.alert(
+        isArabic ? "خطأ في المنتقي" : "Picker Error",
+        message,
+      );
+      return false;
+    } finally {
+      cmsPickerInFlightRef.current = false;
+    }
   };
 
   return (
@@ -434,53 +450,6 @@ export const SettingsScreen = () => {
         <View style={styles.sectionBlock}>
           <Text style={[styles.groupLabel, { color: theme.colors.textMuted }]}>{t("settings.appearance")}</Text>
           <View style={[styles.groupCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-            <View style={styles.inlineRowWrap}>
-              <View style={styles.row}>
-                <View style={styles.rowCopy}>
-                  <Text style={[styles.rowTitle, { color: theme.colors.text }]}>{t("settings.darkMode")}</Text>
-                  <Text style={[styles.rowSubtitle, { color: theme.colors.textMuted }]}>{t("settings.toggleTheme")}</Text>
-                </View>
-                <Switch
-                  value={themeMode === "dark"}
-                  onValueChange={(value) => setThemeMode(value ? "dark" : "light")}
-                  thumbColor={theme.mode === "dark" ? theme.colors.primary : undefined}
-                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                />
-              </View>
-              <View style={[styles.segmentRow, { marginTop: 10 }]}>
-                {(["light", "dark", "system"] as const).map((mode) => {
-                  const selected = themeMode === mode;
-                  const label =
-                    mode === "system"
-                      ? t("settings.systemTheme")
-                      : mode === "dark"
-                        ? t("settings.darkMode")
-                        : isArabic
-                          ? "فاتح"
-                          : "Light";
-                  return (
-                    <Pressable
-                      key={mode}
-                      onPress={() => setThemeMode(mode)}
-                      style={({ pressed }) => [
-                        styles.segmentButton,
-                        styles.flexOne,
-                        {
-                          borderColor: selected ? theme.colors.primary : theme.colors.border,
-                          backgroundColor: selected ? theme.colors.backgroundAlt : "transparent",
-                          opacity: pressed ? 0.9 : 1,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.segmentText, { color: theme.colors.text }]} numberOfLines={1}>
-                        {label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-            <Divider themeBorder={theme.colors.border} style={{ marginLeft: 14 }} />
             <View style={styles.inlineRowWrap}>
               <Text style={[styles.rowTitle, { color: theme.colors.text }]}>{t("settings.language")}</Text>
               <Text style={[styles.rowSubtitle, { color: theme.colors.textMuted }]}>{t("settings.languageDesc")}</Text>
@@ -514,8 +483,14 @@ export const SettingsScreen = () => {
               theme={theme}
               icon="palette"
               title={isArabic ? "ألوان التطبيق (CMS)" : "App Colors (CMS)"}
-              value={cmsTargetMode === "dark" ? (isArabic ? "تحرير ألوان الداكن" : "Edit dark palette") : (isArabic ? "تحرير ألوان الفاتح" : "Edit light palette")}
-              onPress={() => setShowThemeCms(true)}
+              value={
+                isArabic
+                  ? `اللون المحدد: ${selectedThemeColorLabel}`
+                  : `Selected: ${selectedThemeColorLabel}`
+              }
+              onPress={() => {
+                setShowThemeColorModal(true);
+              }}
             />
           </View>
         </View>
@@ -583,7 +558,7 @@ export const SettingsScreen = () => {
                 <Switch
                   value={timeFormat === "24h"}
                   onValueChange={(value) => setTimeFormat(value ? "24h" : "12h")}
-                  thumbColor={theme.mode === "dark" ? theme.colors.primary : undefined}
+                  thumbColor={theme.colors.primary}
                   trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                 />
               </View>
@@ -642,40 +617,6 @@ export const SettingsScreen = () => {
             {activeSheet === "appearance" ? (
               <>
                 <View style={[styles.sheetCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}> 
-                  <View style={styles.row}>
-                    <View style={styles.rowCopy}>
-                      <Text style={[styles.rowTitle, { color: theme.colors.text }]}>{t("settings.darkMode")}</Text>
-                      <Text style={[styles.rowSubtitle, { color: theme.colors.textMuted }]}>{t("settings.toggleTheme")}</Text>
-                    </View>
-                    <Switch
-                      value={themeMode === "dark"}
-                      onValueChange={(value) => setThemeMode(value ? "dark" : "light")}
-                      thumbColor={theme.mode === "dark" ? theme.colors.primary : undefined}
-                      trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                    />
-                  </View>
-
-                  <Divider themeBorder={theme.colors.border} style={{ marginVertical: 12 }} />
-
-                  <Text style={[styles.sectionMiniTitle, { color: theme.colors.text }]}>{t("settings.systemTheme")}</Text>
-                  <View style={styles.segmentWrap}>
-                    <Pressable
-                      onPress={() => setThemeMode("system")}
-                      style={({ pressed }) => [
-                        styles.segmentButton,
-                        {
-                          borderColor: theme.colors.border,
-                          backgroundColor: themeMode === "system" ? theme.colors.backgroundAlt : "transparent",
-                          opacity: pressed ? 0.9 : 1,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.segmentText, { color: theme.colors.text }]}>{t("settings.systemTheme")}</Text>
-                    </Pressable>
-                  </View>
-                </View>
-
-                <View style={[styles.sheetCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}> 
                   <Text style={[styles.sectionMiniTitle, { color: theme.colors.text, marginTop: 0 }]}>{t("settings.language")}</Text>
                   <Text style={[styles.rowSubtitle, { color: theme.colors.textMuted }]}>{t("settings.languageDesc")}</Text>
                   <View style={[styles.segmentRow, { marginTop: 8 }]}> 
@@ -717,7 +658,7 @@ export const SettingsScreen = () => {
                     <Switch
                       value={notificationsEnabled}
                       onValueChange={(value) => void handleNotificationToggle(value)}
-                      thumbColor={theme.mode === "dark" ? theme.colors.primary : undefined}
+                      thumbColor={theme.colors.primary}
                       trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                     />
                   </View>
@@ -746,7 +687,7 @@ export const SettingsScreen = () => {
                         <Switch
                           value={prayerNotificationPrefs[prayer] ?? true}
                           onValueChange={(value) => setPrayerNotificationEnabled(prayer, value)}
-                          thumbColor={theme.mode === "dark" ? theme.colors.primary : undefined}
+                          thumbColor={theme.colors.primary}
                           trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                           disabled={!notificationsEnabled}
                         />
@@ -1049,245 +990,100 @@ export const SettingsScreen = () => {
       </Modal>
 
       <Modal
-        visible={showThemeCms}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowThemeCms(false)}
+        visible={showThemeColorModal}
+        animationType="slide"
+        presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"}
+        onRequestClose={() => setShowThemeColorModal(false)}
       >
-        <View style={styles.cmsBackdrop}>
-          <View
-            style={[
-              styles.cmsSheet,
-              {
-                backgroundColor: theme.mode === "dark" ? "rgba(42,33,25,0.95)" : "rgba(255,253,247,0.96)",
-                borderColor: theme.colors.border,
-              },
-            ]}
-          >
-            <View style={styles.cmsHandle} />
-            <View style={styles.cmsHeaderRow}>
-              <View style={[styles.leadingIcon, { backgroundColor: theme.colors.backgroundAlt }]}>
-                <MaterialIcons name="colorize" size={18} color={theme.colors.primary} />
-              </View>
-              <Text style={[styles.cmsTitle, { color: theme.colors.text }]}>
-                {isArabic ? "الألوان" : "Colors"}
-              </Text>
-              <Pressable onPress={() => setShowThemeCms(false)} style={styles.cmsCloseBtn}>
-                <MaterialIcons name="close" size={28} color={theme.colors.text} />
-              </Pressable>
-            </View>
-
-            <View style={[styles.cmsTabs, { backgroundColor: theme.colors.backgroundAlt }]}>
-              {([
-                ["grid", isArabic ? "شبكة" : "Grid"],
-                ["spectrum", isArabic ? "ألوان" : "Spectrum"],
-                ["sliders", isArabic ? "تحكم" : "Sliders"],
-              ] as const).map(([key, label]) => {
-                const selected = cmsPickerTab === key;
-                return (
-                  <Pressable
-                    key={key}
-                    onPress={() => setCmsPickerTab(key)}
-                    style={[
-                      styles.cmsTabBtn,
-                      selected && { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderWidth: 1 },
-                    ]}
-                  >
-                    <Text style={[styles.cmsTabText, { color: theme.colors.text }]}>{label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <View style={styles.cmsModeRow}>
-              {(["light", "dark"] as const).map((mode) => {
-                const selected = cmsTargetMode === mode;
-                return (
-                  <Pressable
-                    key={mode}
-                    onPress={() => setCmsTargetMode(mode)}
-                    style={({ pressed }) => [
-                      styles.cmsModeBtn,
-                      {
-                        borderColor: selected ? theme.colors.primary : theme.colors.border,
-                        backgroundColor: selected ? theme.colors.backgroundAlt : "transparent",
-                        opacity: pressed ? 0.9 : 1,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.segmentText, { color: theme.colors.text }]}>
-                      {mode === "light" ? (isArabic ? "فاتح" : "Light") : (isArabic ? "داكن" : "Dark")}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-              <Pressable
-                onPress={() => resetThemeCms(cmsTargetMode)}
-                style={({ pressed }) => [
-                  styles.cmsResetBtn,
-                  { borderColor: theme.colors.danger, opacity: pressed ? 0.9 : 1 },
-                ]}
-              >
-                <Text style={[styles.previewButtonText, { color: theme.colors.danger }]}>
-                  {isArabic ? "إعادة ضبط" : "Reset"}
-                </Text>
-              </Pressable>
-            </View>
-
+        <View style={[styles.modalRoot, { backgroundColor: theme.colors.background }]}>
+          <View style={[styles.modalHeader, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
+            <View style={styles.modalHeaderSide} />
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]} numberOfLines={1}>
+              {isArabic ? "ألوان الثيم" : "Theme Colors"}
+            </Text>
             <Pressable
-              onPress={async () => {
-                if (!isNativeUIColorPickerSupported()) {
-                  Alert.alert(
-                    isArabic ? "متاح على iOS فقط" : "iOS Only",
-                    isArabic
-                      ? "هذا الخيار يحتاج iPhone + بناء iOS لاحقاً على Mac."
-                      : "This requires an iPhone and an iOS build later on Mac.",
-                  );
-                  return;
-                }
-                if (!isNativeUIColorPickerAvailable()) {
-                  Alert.alert(
-                    isArabic ? "غير جاهز بعد" : "Not Ready Yet",
-                    isArabic
-                      ? "تم تجهيز الجسر فقط. أضف الموديول iOS على Mac ثم جرّبه."
-                      : "The JS bridge is prepared. Add the iOS native module on Mac, then try again.",
-                  );
-                  return;
-                }
-                try {
-                  const result = await presentNativeUIColorPicker({
-                    initialHex: cmsActiveColor,
-                    supportsAlpha: false,
-                    title: isArabic ? "اختر اللون" : "Pick Color",
-                  });
-                  applyCmsColor(result.hex);
-                } catch (err) {
-                  Alert.alert(
-                    isArabic ? "خطأ في المنتقي" : "Picker Error",
-                    err instanceof Error ? err.message : (isArabic ? "فشل فتح منتقي الألوان" : "Failed to open color picker"),
-                  );
-                }
-              }}
+              onPress={() => setShowThemeColorModal(false)}
               style={({ pressed }) => [
-                styles.cmsNativeBtn,
+                styles.doneButton,
                 {
                   borderColor: theme.colors.border,
                   backgroundColor: theme.colors.backgroundAlt,
-                  opacity: pressed ? 0.9 : 1,
+                  opacity: pressed ? 0.86 : 1,
                 },
               ]}
             >
-              <MaterialIcons name="phone-iphone" size={16} color={theme.colors.primary} />
-              <Text style={[styles.previewButtonText, { color: theme.colors.text }]}>
-                {isArabic ? "جرّب منتقي iOS الأصلي لاحقاً" : "Try Native iOS Picker Later"}
-              </Text>
+              <Text style={[styles.doneButtonText, { color: theme.colors.primary }]}>{isArabic ? "إغلاق" : "Close"}</Text>
             </Pressable>
+          </View>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cmsTokenRow}>
-              {THEME_COLOR_KEYS.map((key) => {
-                const selected = selectedThemeColorKey === key;
-                const swatch = themeCms[cmsTargetMode][key] ?? (cmsTargetMode === "dark" ? darkTheme.colors[key] : lightTheme.colors[key]);
+          <ScrollView
+            style={styles.modalScroll}
+            contentContainerStyle={styles.modalContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={[styles.sheetCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+              <Text style={[styles.rowSubtitle, { color: theme.colors.textMuted }]}>
+                {isArabic
+                  ? "اضغط على أي عنصر لوني لفتح منتقي iOS مباشرة."
+                  : "Tap any color slot to open the native iOS picker directly."}
+              </Text>
+            </View>
+
+            <View style={styles.colorTileGrid}>
+              {THEME_COLOR_OPTIONS.map((option) => {
+                const colorValue = themeCms.light[option.key] ?? lightTheme.colors[option.key];
+                const selected = cmsTargetKey === option.key;
                 return (
                   <Pressable
-                    key={key}
-                    onPress={() => setSelectedThemeColorKey(key)}
+                    key={option.key}
+                    onPress={() => {
+                      setCmsTargetKey(option.key);
+                      void openCmsNativePicker({
+                        showUnavailableAlert: true,
+                        targetKey: option.key,
+                        initialHex: colorValue,
+                      });
+                    }}
                     style={({ pressed }) => [
-                      styles.cmsTokenBtn,
+                      styles.colorTile,
                       {
                         borderColor: selected ? theme.colors.primary : theme.colors.border,
-                        backgroundColor: selected ? theme.colors.backgroundAlt : theme.colors.card,
+                        backgroundColor: pressed ? theme.colors.backgroundAlt : theme.colors.card,
                         opacity: pressed ? 0.9 : 1,
                       },
                     ]}
                   >
-                    <View style={[styles.cmsMiniSwatch, { backgroundColor: swatch }]} />
-                    <Text style={[styles.cmsTokenText, { color: theme.colors.text }]} numberOfLines={1}>
-                      {THEME_COLOR_LABELS[key][isArabic ? "ar" : "en"]}
+                    <View style={styles.colorTileTop}>
+                      <View style={[styles.colorTileSwatch, { backgroundColor: colorValue, borderColor: theme.colors.border }]} />
+                      {selected ? <MaterialIcons name="check-circle" size={18} color={theme.colors.primary} /> : null}
+                    </View>
+                    <Text style={[styles.colorTileTitle, { color: theme.colors.text }]} numberOfLines={1}>
+                      {option[isArabic ? "ar" : "en"]}
+                    </Text>
+                    <Text style={[styles.colorTileValue, { color: theme.colors.textMuted }]} numberOfLines={1}>
+                      {colorValue.toUpperCase()}
                     </Text>
                   </Pressable>
                 );
               })}
-            </ScrollView>
-
-            <View style={[styles.cmsPanel, { borderColor: theme.colors.border, backgroundColor: theme.colors.card }]}>
-              {(cmsPickerTab === "grid" || cmsPickerTab === "spectrum") ? (
-                <View style={styles.cmsGrid}>
-                  {COLOR_GRID.map((hex) => {
-                    const selected = cmsActiveColor.toUpperCase() === hex.toUpperCase();
-                    return (
-                      <Pressable
-                        key={hex}
-                        onPress={() => applyCmsColor(hex)}
-                        style={[
-                          styles.cmsGridCell,
-                          { backgroundColor: hex, borderColor: selected ? "#FFFFFF" : "transparent" },
-                        ]}
-                      />
-                    );
-                  })}
-                </View>
-              ) : (
-                <View style={styles.cmsSliderPane}>
-                  <Text style={[styles.rowSubtitle, { color: theme.colors.textMuted }]}>
-                    {isArabic ? "أدخل لون HEX مثل #B08968" : "Enter HEX color like #B08968"}
-                  </Text>
-                  <TextInput
-                    value={themeHexInput}
-                    onChangeText={setThemeHexInput}
-                    placeholder="#B08968"
-                    autoCapitalize="characters"
-                    placeholderTextColor={theme.colors.textMuted}
-                    style={[
-                      styles.input,
-                      {
-                        marginTop: 8,
-                        borderColor: theme.colors.border,
-                        backgroundColor: theme.colors.backgroundAlt,
-                        color: theme.colors.text,
-                      },
-                    ]}
-                  />
-                  <View style={styles.actionsRow}>
-                    <Pressable
-                      onPress={() => applyCmsColor(themeHexInput)}
-                      style={({ pressed }) => [
-                        styles.primaryButton,
-                        { backgroundColor: theme.colors.primary, opacity: pressed ? 0.85 : 1 },
-                      ]}
-                    >
-                      <Text style={styles.primaryButtonText}>{isArabic ? "تطبيق" : "Apply"}</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              )}
             </View>
 
-            <View style={styles.cmsFooterRow}>
-              <View style={[styles.cmsBigSwatch, { backgroundColor: cmsActiveColor, borderColor: theme.colors.border }]} />
-              <View style={styles.cmsFooterMeta}>
-                <Text style={[styles.rowTitle, { color: theme.colors.text }]}>
-                  {THEME_COLOR_LABELS[selectedThemeColorKey][isArabic ? "ar" : "en"]}
-                </Text>
-                <Text style={[styles.rowSubtitle, { color: theme.colors.textMuted }]}>{cmsActiveColor.toUpperCase()}</Text>
-              </View>
-              <Pressable
-                onPress={() => {
-                  resetThemeCms(cmsTargetMode);
-                  setShowThemeCms(false);
-                }}
-                style={({ pressed }) => [
-                  styles.cmsResetBtn,
-                  { borderColor: theme.colors.border, opacity: pressed ? 0.9 : 1 },
-                ]}
-              >
-                <Text style={[styles.previewButtonText, { color: theme.colors.text }]}>
-                  {isArabic ? "إغلاق" : "Close"}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
+            <Pressable
+              onPress={() => resetThemeCms("light")}
+              style={({ pressed }) => [
+                styles.resetButton,
+                { borderColor: theme.colors.danger, opacity: pressed ? 0.85 : 1, marginTop: 0 },
+              ]}
+            >
+              <Text style={[styles.resetButtonText, { color: theme.colors.danger }]}>
+                {isArabic ? "إعادة ألوان الثيم الافتراضية" : "Reset Theme Colors to Default"}
+              </Text>
+            </Pressable>
+          </ScrollView>
         </View>
       </Modal>
+
     </>
   );
 };
@@ -1324,6 +1120,54 @@ const styles = StyleSheet.create({
   listRowCopy: { flex: 1, gap: 2 },
   listRowTitle: { fontSize: 15, fontWeight: "600" },
   listRowValue: { fontSize: 12, lineHeight: 16 },
+  colorAssignRow: {
+    minHeight: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  colorAssignSwatch: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  colorTileGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  colorTile: {
+    width: "48.5%",
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    minHeight: 108,
+  },
+  colorTileTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  colorTileSwatch: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  colorTileTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  colorTileValue: {
+    fontSize: 12,
+    marginTop: 4,
+  },
   rowDivider: { height: StyleSheet.hairlineWidth, marginLeft: 60 },
   cmsBackdrop: {
     flex: 1,
@@ -1407,6 +1251,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   cmsGrid: {
+    width: "100%",
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 0,
@@ -1414,8 +1259,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   cmsGridCell: {
-    width: "16.6667%",
-    aspectRatio: 1,
+    flexShrink: 0,
     borderWidth: 2,
   },
   cmsSliderPane: { gap: 4 },
@@ -1526,4 +1370,3 @@ const styles = StyleSheet.create({
   },
   resetButtonText: { fontWeight: "700" },
 });
-

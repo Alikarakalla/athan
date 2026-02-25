@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import {
-  Audio,
-  InterruptionModeAndroid,
-  InterruptionModeIOS,
-  type AVPlaybackStatusSuccess,
-} from "expo-av";
+  createAudioPlayer,
+  setAudioModeAsync,
+  type AudioPlayer as ExpoAudioPlayer,
+} from "expo-audio";
 
 import { useAppTheme } from "../hooks/useAppTheme";
 import { Card } from "./Card";
@@ -18,7 +17,7 @@ interface AudioPlayerProps {
 
 export const AudioPlayer = ({ ayahAudioUrls, title = "Surah Audio", subtitle }: AudioPlayerProps) => {
   const theme = useAppTheme();
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<ExpoAudioPlayer | null>(null);
   const queueRef = useRef<string[]>(ayahAudioUrls);
   const currentIndexRef = useRef(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -36,7 +35,7 @@ export const AudioPlayer = ({ ayahAudioUrls, title = "Surah Audio", subtitle }: 
     const reset = async () => {
       if (soundRef.current) {
         try {
-          await soundRef.current.unloadAsync();
+          soundRef.current.remove();
         } catch {
           // Ignore cleanup errors.
         }
@@ -51,7 +50,7 @@ export const AudioPlayer = ({ ayahAudioUrls, title = "Surah Audio", subtitle }: 
   const unloadCurrent = useCallback(async () => {
     if (!soundRef.current) return;
     try {
-      await soundRef.current.unloadAsync();
+      soundRef.current.remove();
     } finally {
       soundRef.current = null;
     }
@@ -64,40 +63,35 @@ export const AudioPlayer = ({ ayahAudioUrls, title = "Surah Audio", subtitle }: 
       setError(null);
 
       try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-          interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-          interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-          shouldDuckAndroid: true,
+        await setAudioModeAsync({
+          allowsRecording: false,
+          playsInSilentMode: true,
+          shouldPlayInBackground: false,
+          interruptionMode: 'doNotMix',
         });
 
         await unloadCurrent();
 
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: queueRef.current[index] },
-          { shouldPlay: true },
-          async (status) => {
-            if (!status.isLoaded) return;
-            const loadedStatus = status as AVPlaybackStatusSuccess;
-            setIsPlaying(loadedStatus.isPlaying);
+        const sound = createAudioPlayer(queueRef.current[index]);
+        sound.addListener('playbackStatusUpdate', async (status) => {
+          if (!status.isLoaded) return;
+          setIsPlaying(status.playing);
 
-            if (loadedStatus.didJustFinish) {
-              const nextIndex = currentIndexRef.current + 1;
-              if (queueRef.current[nextIndex]) {
-                currentIndexRef.current = nextIndex;
-                setCurrentIndex(nextIndex);
-                await playIndex(nextIndex);
-              } else {
-                setIsPlaying(false);
-                setCurrentIndex(0);
-                currentIndexRef.current = 0;
-                await unloadCurrent();
-              }
+          if (status.didJustFinish) {
+            const nextIndex = currentIndexRef.current + 1;
+            if (queueRef.current[nextIndex]) {
+              currentIndexRef.current = nextIndex;
+              setCurrentIndex(nextIndex);
+              await playIndex(nextIndex);
+            } else {
+              setIsPlaying(false);
+              setCurrentIndex(0);
+              currentIndexRef.current = 0;
+              await unloadCurrent();
             }
-          },
-        );
+          }
+        });
+        sound.play();
 
         soundRef.current = sound;
         currentIndexRef.current = index;
@@ -122,17 +116,16 @@ export const AudioPlayer = ({ ayahAudioUrls, title = "Surah Audio", subtitle }: 
         return;
       }
 
-      const status = await soundRef.current.getStatusAsync();
-      if (!status.isLoaded) {
+      if (!soundRef.current.isLoaded) {
         await playIndex(currentIndexRef.current);
         return;
       }
 
-      if (status.isPlaying) {
-        await soundRef.current.pauseAsync();
+      if (soundRef.current.playing) {
+        soundRef.current.pause();
         setIsPlaying(false);
       } else {
-        await soundRef.current.playAsync();
+        soundRef.current.play();
         setIsPlaying(true);
       }
     } catch (err) {

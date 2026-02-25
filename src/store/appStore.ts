@@ -17,6 +17,32 @@ import { NOTIFICATION_PRAYERS, STORAGE_KEYS } from "../utils/constants";
 
 type PrayerNotificationPrefs = Partial<Record<PrayerName, boolean>>;
 
+export interface QuranPlayerState {
+  sourceUrl: string | null;
+  surahNumber: number | null;
+  surahName: string;
+  totalAyahs: number;
+  currentAyah: number | null;
+  isLoading: boolean;
+  isPlaying: boolean;
+  positionMillis: number;
+  durationMillis: number;
+  error: string | null;
+}
+
+const INITIAL_QURAN_PLAYER_STATE: QuranPlayerState = {
+  sourceUrl: null,
+  surahNumber: null,
+  surahName: "",
+  totalAyahs: 0,
+  currentAyah: null,
+  isLoading: false,
+  isPlaying: false,
+  positionMillis: 0,
+  durationMillis: 0,
+  error: null,
+};
+
 interface AppState {
   themeMode: ThemeMode;
   themeCms: ThemeCmsConfig;
@@ -35,6 +61,7 @@ interface AppState {
   quranReciterName: string;
   bookmarks: QuranBookmark[];
   lastRead: LastReadPosition | null;
+  quranPlayer: QuranPlayerState;
   setThemeMode: (mode: ThemeMode) => void;
   setThemeColor: (targetMode: "light" | "dark", key: ThemeColorKey, value: string) => void;
   resetThemeCms: (targetMode?: "light" | "dark") => void;
@@ -54,13 +81,15 @@ interface AppState {
   toggleBookmark: (bookmark: Omit<QuranBookmark, "id" | "createdAt">) => void;
   removeBookmark: (id: string) => void;
   setLastRead: (lastRead: LastReadPosition) => void;
+  setQuranPlayerState: (patch: Partial<QuranPlayerState>) => void;
+  resetQuranPlayer: () => void;
   clearCachedContentState: () => void;
 }
 
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
-      themeMode: "system",
+      themeMode: "light",
       themeCms: { light: {}, dark: {} },
       language: "ar",
       notificationsEnabled: true,
@@ -77,8 +106,9 @@ export const useAppStore = create<AppState>()(
       quranReciterName: "Mishari Rashid al-`Afasy",
       bookmarks: [],
       lastRead: null,
+      quranPlayer: INITIAL_QURAN_PLAYER_STATE,
 
-      setThemeMode: (themeMode) => set({ themeMode }),
+      setThemeMode: () => set({ themeMode: "light" }),
       setThemeColor: (targetMode, key, value) =>
         set((state) => ({
           themeCms: {
@@ -138,6 +168,14 @@ export const useAppStore = create<AppState>()(
 
       removeBookmark: (id) => set({ bookmarks: get().bookmarks.filter((b) => b.id !== id) }),
       setLastRead: (lastRead) => set({ lastRead }),
+      setQuranPlayerState: (patch) =>
+        set((state) => ({
+          quranPlayer: {
+            ...state.quranPlayer,
+            ...patch,
+          },
+        })),
+      resetQuranPlayer: () => set({ quranPlayer: INITIAL_QURAN_PLAYER_STATE }),
 
       clearCachedContentState: () =>
         set({
