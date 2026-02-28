@@ -54,13 +54,13 @@ export default function RootLayout() {
               headerShown: false,
               presentation: isIOS ? "formSheet" : "modal",
               animation: isIOS ? "default" : "slide_from_bottom",
-              sheetAllowedDetents: isIOS ? [0.5] : undefined,
+              sheetAllowedDetents: isIOS ? [0.6] : undefined,
               sheetInitialDetentIndex: isIOS ? 0 : undefined,
               sheetGrabberVisible: isIOS,
               sheetExpandsWhenScrolledToEdge: false,
               sheetCornerRadius: isIOS ? 34 : undefined,
               contentStyle: {
-                backgroundColor: isIOS ? "transparent" : theme.colors.background,
+                backgroundColor: theme.colors.background,
               },
             }}
           />
@@ -68,6 +68,18 @@ export default function RootLayout() {
             name="city-picker"
             options={{
               headerShown: true,
+              presentation: "card",
+              animation: "default",
+              contentStyle: {
+                backgroundColor: theme.colors.background,
+              },
+              gestureEnabled: true,
+            }}
+          />
+          <Stack.Screen
+            name="shia-supplications"
+            options={{
+              headerShown: false,
               presentation: "card",
               animation: "default",
               contentStyle: {

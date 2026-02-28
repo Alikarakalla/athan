@@ -2,10 +2,11 @@
   "expo": {
     "name": "Shia Athan & Quran",
     "slug": "shia-athan-quran",
+    "scheme": "shiaathanquran",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -17,6 +18,7 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Your location is used to calculate Shia (Ja'fari) prayer times.",
         "NSUserNotificationUsageDescription": "Notifications are used for Athan reminders at prayer times.",
+        "NSSupportsLiveActivities": true,
         "UIBackgroundModes": [
           "audio"
         ]

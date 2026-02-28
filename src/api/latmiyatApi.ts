@@ -24,11 +24,74 @@ const LATMIYAT_KEYWORDS = [
   "karbala",
 ];
 
+const SHIA_DUA_KEYWORDS = [
+  "دعاء",
+  "دعا",
+  "dua",
+  "kumayl",
+  "koumail",
+  "komail",
+  "كوميل",
+  "كميل",
+  "tawassul",
+  "tawasul",
+  "توسل",
+  "التوسل",
+  "nudba",
+  "ندبة",
+  "sabah",
+  "الصباح",
+  "الفرج",
+  "عهد",
+  "العهد",
+  "عاشوراء",
+  "ziyarat",
+  "زيارة",
+  "شيعي",
+  "ahlulbayt",
+  "imam",
+];
+
+const SHIA_ATHKAR_KEYWORDS = [
+  "ذكر",
+  "اذكار",
+  "أذكار",
+  "athkar",
+  "azkar",
+  "tasbih",
+  "تسبيح",
+  "استغفار",
+  "استغفر",
+  "istighfar",
+  "salawat",
+  "صلوات",
+  "يا الله",
+  "حوقلة",
+  "حوقلة",
+  "شيعي",
+  "hussain",
+  "imam ali",
+];
+
 const DEFAULT_LATMIYAT_TERMS = [
   "لطميات حسينية شيعية",
   "noha latmiyat shia",
   "nadeem sarwar noha",
   "basim karbalaei latmiyat",
+] as const;
+
+const DEFAULT_SHIA_DUA_TERMS = [
+  "دعاء كميل شيعي",
+  "دعاء التوسل شيعي",
+  "Dua Kumayl Shia",
+  "Dua Tawassul",
+] as const;
+
+const DEFAULT_SHIA_ATHKAR_TERMS = [
+  "اذكار شيعية",
+  "تسبيح استغفار شيعي",
+  "Shia Athkar",
+  "Shia Dhikr",
 ] as const;
 
 interface SoundCloudTranscoding {
@@ -136,7 +199,7 @@ const getSoundCloudClientId = async (): Promise<string> => {
 
 const normalizeText = (value: string | null | undefined): string => (value ?? "").toLowerCase();
 
-const isLatmiyatOnly = (track: SoundCloudTrackRaw): boolean => {
+const trackMatchesKeywords = (track: SoundCloudTrackRaw, keywords: readonly string[]): boolean => {
   const text = [
     track.title,
     track.description,
@@ -149,7 +212,7 @@ const isLatmiyatOnly = (track: SoundCloudTrackRaw): boolean => {
     .join(" ")
     .toLowerCase();
 
-  return LATMIYAT_KEYWORDS.some((keyword) => text.includes(keyword));
+  return keywords.some((keyword) => text.includes(keyword));
 };
 
 const pickPreferredTranscoding = (track: SoundCloudTrackRaw): SoundCloudTranscoding | null => {
@@ -196,7 +259,12 @@ const dedupeTracks = (tracks: LatmiyatTrack[]): LatmiyatTrack[] => {
   return deduped;
 };
 
-const searchSoundCloud = async (query: string, clientId: string, limit = 50): Promise<LatmiyatTrack[]> => {
+const searchSoundCloud = async (
+  query: string,
+  clientId: string,
+  keywords: readonly string[],
+  limit = 50,
+): Promise<LatmiyatTrack[]> => {
   const params = new URLSearchParams({
     q: query,
     client_id: clientId,
@@ -211,25 +279,56 @@ const searchSoundCloud = async (query: string, clientId: string, limit = 50): Pr
   const payload = (await response.json()) as SoundCloudSearchResponse;
   const tracks = payload.collection ?? [];
   return tracks
-    .filter(isLatmiyatOnly)
+    .filter((track) => trackMatchesKeywords(track, keywords))
     .map(mapTrack)
     .filter((item): item is LatmiyatTrack => !!item);
 };
 
-export const fetchLatmiyatTracks = async (query?: string): Promise<LatmiyatTrack[]> => {
+const fetchByTermsAndKeywords = async (
+  terms: readonly string[],
+  keywords: readonly string[],
+): Promise<LatmiyatTrack[]> => {
   const clientId = await getSoundCloudClientId();
-  const userQuery = query?.trim();
-
-  const searchTerms = userQuery
-    ? [`${userQuery} لطميات حسينية`, `${userQuery} noha latmiyat hussaini`]
-    : [...DEFAULT_LATMIYAT_TERMS];
-
-  const buckets = await Promise.all(searchTerms.map((term) => searchSoundCloud(term, clientId, 40)));
+  const buckets = await Promise.all(terms.map((term) => searchSoundCloud(term, clientId, keywords, 40)));
   return dedupeTracks(buckets.flat()).sort((a, b) => {
     const dateA = a.releaseDate ? Date.parse(a.releaseDate) : 0;
     const dateB = b.releaseDate ? Date.parse(b.releaseDate) : 0;
     return dateB - dateA;
   });
+};
+
+export const fetchLatmiyatTracks = async (query?: string): Promise<LatmiyatTrack[]> => {
+  const userQuery = query?.trim();
+
+  const searchTerms = userQuery
+    ? [`${userQuery} لطميات حسينية`, `${userQuery} noha latmiyat hussaini`]
+    : [...DEFAULT_LATMIYAT_TERMS];
+  return fetchByTermsAndKeywords(searchTerms, LATMIYAT_KEYWORDS);
+};
+
+export type ShiaSupplicationMode = "dua" | "athkar";
+
+export const fetchShiaSupplicationTracks = async (
+  mode: ShiaSupplicationMode,
+  query?: string,
+): Promise<LatmiyatTrack[]> => {
+  const userQuery = query?.trim();
+
+  if (mode === "dua") {
+    const terms = userQuery
+      ? [
+          `${userQuery} دعاء شيعي`,
+          `${userQuery} dua shia`,
+          `${userQuery} kumayl tawassul`,
+        ]
+      : [...DEFAULT_SHIA_DUA_TERMS];
+    return fetchByTermsAndKeywords(terms, SHIA_DUA_KEYWORDS);
+  }
+
+  const terms = userQuery
+    ? [`${userQuery} اذكار شيعية`, `${userQuery} athkar shia`, `${userQuery} tasbih istighfar`]
+    : [...DEFAULT_SHIA_ATHKAR_TERMS];
+  return fetchByTermsAndKeywords(terms, SHIA_ATHKAR_KEYWORDS);
 };
 
 export const resolveLatmiyatPlaybackUrl = async (transcodingApiUrl: string): Promise<string> => {

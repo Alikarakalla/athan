@@ -76,6 +76,7 @@ interface AppState {
   themeCms: ThemeCmsConfig;
   language: AppLanguage;
   notificationsEnabled: boolean;
+  liveActivityEnabled: boolean;
   prayerNotificationPrefs: PrayerNotificationPrefs;
   athanSound: AthanSoundKey;
   timeFormat: TimeFormat;
@@ -96,6 +97,7 @@ interface AppState {
   resetThemeCms: (targetMode?: "light" | "dark") => void;
   setLanguage: (language: AppLanguage) => void;
   setNotificationsEnabled: (enabled: boolean) => void;
+  setLiveActivityEnabled: (enabled: boolean) => void;
   setPrayerNotificationEnabled: (prayerName: PrayerName, enabled: boolean) => void;
   togglePrayerNotificationEnabled: (prayerName: PrayerName) => void;
   setAthanSound: (sound: AthanSoundKey) => void;
@@ -120,10 +122,11 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
-      themeMode: "light",
+      themeMode: "dark",
       themeCms: { light: {}, dark: {} },
       language: "ar",
       notificationsEnabled: true,
+      liveActivityEnabled: true,
       prayerNotificationPrefs: Object.fromEntries(NOTIFICATION_PRAYERS.map((p) => [p, true])) as PrayerNotificationPrefs,
       athanSound: "default",
       timeFormat: "12h",
@@ -140,7 +143,7 @@ export const useAppStore = create<AppState>()(
       quranPlayer: INITIAL_QURAN_PLAYER_STATE,
       latmiyatPlayer: INITIAL_LATMIYAT_PLAYER_STATE,
 
-      setThemeMode: () => set({ themeMode: "light" }),
+      setThemeMode: () => set({ themeMode: "dark" }),
       setThemeColor: (targetMode, key, value) =>
         set((state) => ({
           themeCms: {
@@ -159,6 +162,7 @@ export const useAppStore = create<AppState>()(
         })),
       setLanguage: (language) => set({ language }),
       setNotificationsEnabled: (notificationsEnabled) => set({ notificationsEnabled }),
+      setLiveActivityEnabled: (liveActivityEnabled) => set({ liveActivityEnabled }),
       setPrayerNotificationEnabled: (prayerName, enabled) =>
         set((state) => ({
           prayerNotificationPrefs: { ...state.prayerNotificationPrefs, [prayerName]: enabled },
@@ -231,6 +235,7 @@ export const useAppStore = create<AppState>()(
         themeCms: state.themeCms,
         language: state.language,
         notificationsEnabled: state.notificationsEnabled,
+        liveActivityEnabled: state.liveActivityEnabled,
         prayerNotificationPrefs: state.prayerNotificationPrefs,
         athanSound: state.athanSound,
         timeFormat: state.timeFormat,

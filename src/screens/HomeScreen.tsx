@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import {
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -7,7 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 
 import { useAppTheme } from "../hooks/useAppTheme";
@@ -136,6 +137,13 @@ const formatIslamic = (date: Date, timeZone?: string, locale = "en", isArabic = 
 };
 
 const GAUGE_SEGMENTS = 42;
+const getIOSMajorVersion = (): number => {
+  if (Platform.OS !== "ios") return 0;
+  const version = Platform.Version;
+  if (typeof version === "number") return version;
+  const parsed = Number.parseInt(`${version}`.split(".")[0] ?? "0", 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 
 const getNextPrayerProgress = (
   prayers: NonNullable<ReturnType<typeof useAppStore.getState>["prayerTimes"]>["prayers"] | undefined,
@@ -346,6 +354,7 @@ const HeroPrayerGauge = ({
 };
 
 export const HomeScreen = () => {
+  const insets = useSafeAreaInsets();
   const theme = useAppTheme();
   const prayerTimes = useAppStore((s) => s.prayerTimes);
   const manualCity = useAppStore((s) => s.manualCity);
@@ -390,15 +399,34 @@ export const HomeScreen = () => {
     sunrisePrayer && maghribPrayer
       ? nowTs < sunrisePrayer.timestamp || nowTs >= maghribPrayer.timestamp
       : true;
+  const isIOSNativeTabs = Platform.OS === "ios" && getIOSMajorVersion() >= 26;
+  const topContentInset = 0;
+  const bottomContentInset =
+    Platform.OS === "ios"
+      ? isIOSNativeTabs
+        ? Math.max(insets.bottom + 12, 20)
+        : Math.max(insets.bottom + 86, 86)
+      : Math.max(insets.bottom + 86, 86);
 
   return (
     <SafeAreaView
       style={[styles.safe, { backgroundColor: palette.bg }]}
-      edges={["top", "left", "right"]}
+      edges={Platform.OS === "ios" ? ["left", "right", "bottom"] : ["top", "left", "right", "bottom"]}
     >
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentInsetAdjustmentBehavior="never"
+        scrollIndicatorInsets={{
+          top: topContentInset,
+          bottom: bottomContentInset,
+        }}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: topContentInset,
+            paddingBottom: bottomContentInset,
+          },
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={isLoading}
@@ -614,11 +642,11 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingTop: 0,
-    paddingBottom: 24,
+    paddingBottom: 0,
   },
   main: {
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 0,
     gap: 18,
   },
   featureWrap: {},

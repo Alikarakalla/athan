@@ -9,6 +9,7 @@ import {
   savePrayerTimesCache,
 } from "../api/prayerApi";
 import { syncAthanNotifications } from "../services/notificationService";
+import { clearAthanWidget, syncAthanWidget, syncLiveActivityEnabled } from "../services/iosAthanWidgetService";
 import { useAppStore } from "../store/appStore";
 import {
   formatCountdown,
@@ -18,6 +19,7 @@ import {
   isPrayerCacheValidForToday,
   shouldRefreshForNewDay,
 } from "../utils/prayerHelpers";
+import { applyThemeCms, darkTheme } from "../utils/theme";
 import type { PrayerHookState } from "../types/prayer";
 
 export const usePrayerTimes = (): PrayerHookState => {
@@ -26,8 +28,11 @@ export const usePrayerTimes = (): PrayerHookState => {
   const coordinates = useAppStore((s) => s.coordinates);
   const timeFormat = useAppStore((s) => s.timeFormat);
   const notificationsEnabled = useAppStore((s) => s.notificationsEnabled);
+  const liveActivityEnabled = useAppStore((s) => s.liveActivityEnabled);
   const prayerNotificationPrefs = useAppStore((s) => s.prayerNotificationPrefs);
   const athanSound = useAppStore((s) => s.athanSound);
+  const themeCms = useAppStore((s) => s.themeCms);
+  const language = useAppStore((s) => s.language);
   const setPrayerTimes = useAppStore((s) => s.setPrayerTimes);
   const setCoordinates = useAppStore((s) => s.setCoordinates);
   const setLocationPermission = useAppStore((s) => s.setLocationPermission);
@@ -159,6 +164,10 @@ export const usePrayerTimes = (): PrayerHookState => {
   }, [athanSound, notificationsEnabled, prayerNotificationPrefs, prayerTimes]);
 
   useEffect(() => {
+    syncLiveActivityEnabled(liveActivityEnabled);
+  }, [liveActivityEnabled]);
+
+  useEffect(() => {
     const bootstrap = async () => {
       if (didBootstrapRef.current) return;
       didBootstrapRef.current = true;
@@ -200,6 +209,59 @@ export const usePrayerTimes = (): PrayerHookState => {
     () => (prayerTimes ? getNextPrayerInfo(prayerTimes.prayers, nowMs) : null),
     [nowMs, prayerTimes],
   );
+  const widgetTheme = useMemo(() => applyThemeCms(darkTheme, themeCms), [themeCms]);
+  const nextPrayerName = nextPrayer?.prayer.name;
+  const nextPrayerTimestampMs = nextPrayer?.prayer.timestamp;
+  const nextPrayerDisplayTime = nextPrayer?.prayer.displayTime;
+  const prayerTimezone = prayerTimes?.timezone;
+  const prayerCity = prayerTimes?.city;
+
+  useEffect(() => {
+    if (!nextPrayerName || !nextPrayerTimestampMs || !nextPrayerDisplayTime || !prayerTimezone) {
+      clearAthanWidget();
+      return;
+    }
+
+    const resolvedCity = manualCity ?? prayerCity ?? null;
+    const cityLabel = resolvedCity ? `${resolvedCity.city}, ${resolvedCity.country}` : null;
+
+    syncAthanWidget({
+      nextPrayerName,
+      nextPrayerTimestampMs,
+      nextPrayerDisplayTime,
+      timezone: prayerTimezone,
+      cityLabel,
+      language,
+      theme: {
+        background: widgetTheme.colors.background,
+        backgroundAlt: widgetTheme.colors.backgroundAlt,
+        card: widgetTheme.colors.card,
+        border: widgetTheme.colors.border,
+        text: widgetTheme.colors.text,
+        textMuted: widgetTheme.colors.textMuted,
+        primary: widgetTheme.colors.primary,
+        accent: widgetTheme.colors.accent,
+      },
+    });
+  }, [
+    language,
+    manualCity?.city,
+    manualCity?.country,
+    nextPrayerDisplayTime,
+    nextPrayerName,
+    nextPrayerTimestampMs,
+    prayerCity?.city,
+    prayerCity?.country,
+    prayerTimezone,
+    widgetTheme.colors.accent,
+    widgetTheme.colors.background,
+    widgetTheme.colors.backgroundAlt,
+    widgetTheme.colors.border,
+    widgetTheme.colors.card,
+    widgetTheme.colors.primary,
+    widgetTheme.colors.text,
+    widgetTheme.colors.textMuted,
+  ]);
 
   return {
     isLoading,

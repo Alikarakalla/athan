@@ -12,11 +12,80 @@
 		7248B2D98EAACEC9C4F09163 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46DF5FDF92D33A022A1CA015 /* ExpoModulesProvider.swift */; };
 		87410AB8305C08ED2B8159FA /* libPods-ShiaAthanQuran.a in Frameworks */ = {isa = PBXBuildFile; fileRef = FDA7340D7D63B65F14933666 /* libPods-ShiaAthanQuran.a */; };
 		953F7B4E0EFD68704149D32C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E341946E9AC2A45A83E54FA0 /* PrivacyInfo.xcprivacy */; };
+		A70000000000000000000020 /* AthanWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70000000000000000000011 /* AthanWidgetBundle.swift */; };
+		A70000000000000000000021 /* AthanWidgetBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70000000000000000000014 /* AthanWidgetBridge.swift */; };
+		A70000000000000000000022 /* AthanWidgetBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = A70000000000000000000015 /* AthanWidgetBridge.m */; };
+		A70000000000000000000023 /* AthanWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A70000000000000000000010 /* AthanWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A1B2C3D4E5F60718293A4B5C /* ExpoUIColorPicker.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* ExpoUIColorPicker.m */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		C1D2E3F4A5B60718293A4B5C /* CityMenuButton.m in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F4A5B60718293A4B5D /* CityMenuButton.m */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
+		B2DEB8CCE7174D0AAC1C2799 /* AthanWatchApp.app in Copy Files */ = {isa = PBXBuildFile; fileRef = 60B1800A574C48A3B5F9F044 /* AthanWatchApp.app */; };
+		2A1A920F161E4A268FD624DA /* AthanWatchExtension.appex in Copy Files */ = {isa = PBXBuildFile; fileRef = C2179A2852484F8E8B81712A /* AthanWatchExtension.appex */; };
+		2A3EC6BC263D4B81B421F907 /* AthanWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F62AAFA03C0486A95D3E129 /* AthanWatchApp.swift */; };
+		8D65BCBA4D3E40CFA880CF1A /* AthanWatchConnectivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22A6AC1D0D7C4846A33C64BA /* AthanWatchConnectivity.swift */; };
+		11748EFA1627418A92DF81A0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9CD00D7AEE5A4FA0871045D4 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A70000000000000000000060 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A70000000000000000000050;
+			remoteInfo = AthanWidgetExtension;
+		};
+		C2EC035A9F3F4DF5BBDA5377 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DD1AC6C78AD043DD8AE76588;
+			remoteInfo = "AthanWatchApp";
+		};
+		918EE605EEE44808B9137805 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7AD503C24F0D42419F68A22E;
+			remoteInfo = "AthanWatchExtension";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A70000000000000000000030 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A70000000000000000000023 /* AthanWidgetExtension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		06E9240DD15A41C69F888DB9 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B2DEB8CCE7174D0AAC1C2799 /* "AthanWatchApp.app" in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			name = "Embed Watch Content";
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+		};
+		6574759DF899453FA70B97EA /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2A1A920F161E4A268FD624DA /* "AthanWatchExtension.appex" in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			name = "Embed App Extensions";
+			dstPath = "";
+			dstSubfolderSpec = 13;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* ShiaAthanQuran.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShiaAthanQuran.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -24,6 +93,12 @@
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = ShiaAthanQuran/Info.plist; sourceTree = "<group>"; };
 		46DF5FDF92D33A022A1CA015 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-ShiaAthanQuran/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		48AFDBC56931C21345FF163F /* Pods-ShiaAthanQuran.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ShiaAthanQuran.release.xcconfig"; path = "Target Support Files/Pods-ShiaAthanQuran/Pods-ShiaAthanQuran.release.xcconfig"; sourceTree = "<group>"; };
+		A70000000000000000000010 /* AthanWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AthanWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A70000000000000000000011 /* AthanWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AthanWidgetBundle.swift; sourceTree = "<group>"; };
+		A70000000000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A70000000000000000000013 /* AthanWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AthanWidgetExtension.entitlements; sourceTree = "<group>"; };
+		A70000000000000000000014 /* AthanWidgetBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AthanWidgetBridge.swift; path = ShiaAthanQuran/AthanWidgetBridge.swift; sourceTree = "<group>"; };
+		A70000000000000000000015 /* AthanWidgetBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = AthanWidgetBridge.m; path = ShiaAthanQuran/AthanWidgetBridge.m; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5D /* ExpoUIColorPicker.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = ExpoUIColorPicker.m; path = ShiaAthanQuran/ExpoUIColorPicker.m; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = ShiaAthanQuran/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
@@ -34,6 +109,14 @@
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = ShiaAthanQuran/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* ShiaAthanQuran-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "ShiaAthanQuran-Bridging-Header.h"; path = "ShiaAthanQuran/ShiaAthanQuran-Bridging-Header.h"; sourceTree = "<group>"; };
 		FDA7340D7D63B65F14933666 /* libPods-ShiaAthanQuran.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-ShiaAthanQuran.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		60B1800A574C48A3B5F9F044 /* AthanWatchApp.app */ = {isa = PBXFileReference; name = "AthanWatchApp.app"; path = "AthanWatchApp.app"; sourceTree = BUILT_PRODUCTS_DIR; fileEncoding = undefined; lastKnownFileType = undefined; explicitFileType = "wrapper.application"; includeInIndex = 0; };
+		C2179A2852484F8E8B81712A /* AthanWatchExtension.appex */ = {isa = PBXFileReference; name = "AthanWatchExtension.appex"; path = "AthanWatchExtension.appex"; sourceTree = BUILT_PRODUCTS_DIR; fileEncoding = undefined; lastKnownFileType = undefined; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; };
+		D6E6D103B8E94BB6A055985C /* Info.plist */ = {isa = PBXFileReference; name = "Info.plist"; path = "Info.plist"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = text.plist.xml; explicitFileType = undefined; includeInIndex = 0; };
+		6BDBC7D711C0483598FFA500 /* Info.plist */ = {isa = PBXFileReference; name = "Info.plist"; path = "Info.plist"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = text.plist.xml; explicitFileType = undefined; includeInIndex = 0; };
+		EDDA693CB9BA46C9BA668B4C /* AthanWatchExtension.entitlements */ = {isa = PBXFileReference; name = "AthanWatchExtension.entitlements"; path = "AthanWatchExtension.entitlements"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		8F62AAFA03C0486A95D3E129 /* AthanWatchApp.swift */ = {isa = PBXFileReference; name = "AthanWatchApp.swift"; path = "AthanWatchApp.swift"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = sourcecode.swift; explicitFileType = undefined; includeInIndex = 0; };
+		22A6AC1D0D7C4846A33C64BA /* AthanWatchConnectivity.swift */ = {isa = PBXFileReference; name = "AthanWatchConnectivity.swift"; path = "AthanWatchConnectivity.swift"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = sourcecode.swift; explicitFileType = undefined; includeInIndex = 0; };
+		9CD00D7AEE5A4FA0871045D4 /* Assets.xcassets */ = {isa = PBXFileReference; name = "Assets.xcassets"; path = "Assets.xcassets"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = folder.assetcatalog; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,6 +128,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A70000000000000000000032 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1DA00C6669CF4D20AD9F4A77 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3452702E2B76454E95EE1864 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -52,6 +156,8 @@
 			isa = PBXGroup;
 			children = (
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
+				A70000000000000000000014 /* AthanWidgetBridge.swift */,
+				A70000000000000000000015 /* AthanWidgetBridge.m */,
 				A1B2C3D4E5F60718293A4B5D /* ExpoUIColorPicker.m */,
 				C1D2E3F4A5B60718293A4B5D /* CityMenuButton.m */,
 				F11748442D0722820044C1D9 /* ShiaAthanQuran-Bridging-Header.h */,
@@ -98,15 +204,28 @@
 			name = Libraries;
 			sourceTree = "<group>";
 		};
+		A70000000000000000000040 /* AthanWidgetExtension */ = {
+			isa = PBXGroup;
+			children = (
+				A70000000000000000000011 /* AthanWidgetBundle.swift */,
+				A70000000000000000000012 /* Info.plist */,
+				A70000000000000000000013 /* AthanWidgetExtension.entitlements */,
+			);
+			path = AthanWidgetExtension;
+			sourceTree = "<group>";
+		};
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
 				13B07FAE1A68108700A75B9A /* ShiaAthanQuran */,
+				A70000000000000000000040 /* AthanWidgetExtension */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				1C931DB41A91CC5C5B8E027F /* Pods */,
 				2588D74A6782545568C988D2 /* ExpoModulesProviders */,
+				C2FEB56D0093487AA28DED95 /* AthanWatchApp */,
+				247E9846C15C465F893E7C87 /* AthanWatchExtension */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -117,6 +236,9 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* ShiaAthanQuran.app */,
+				A70000000000000000000010 /* AthanWidgetExtension.appex */,
+				60B1800A574C48A3B5F9F044 /* AthanWatchApp.app */,
+				C2179A2852484F8E8B81712A /* AthanWatchExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -138,30 +260,109 @@
 			name = ShiaAthanQuran;
 			sourceTree = "<group>";
 		};
+		C2FEB56D0093487AA28DED95 /* AthanWatchApp */ = {
+			isa = PBXGroup;
+			children = (
+				D6E6D103B8E94BB6A055985C /* Info.plist */,
+			);
+			name = AthanWatchApp;
+			path = AthanWatchApp;
+			sourceTree = "<group>";
+		};
+		247E9846C15C465F893E7C87 /* AthanWatchExtension */ = {
+			isa = PBXGroup;
+			children = (
+				6BDBC7D711C0483598FFA500 /* Info.plist */,
+				EDDA693CB9BA46C9BA668B4C /* AthanWatchExtension.entitlements */,
+				8F62AAFA03C0486A95D3E129 /* AthanWatchApp.swift */,
+				22A6AC1D0D7C4846A33C64BA /* AthanWatchConnectivity.swift */,
+				9CD00D7AEE5A4FA0871045D4 /* Assets.xcassets */,
+			);
+			name = AthanWatchExtension;
+			path = AthanWatchExtension;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
 		13B07F861A680F5B00A75B9A /* ShiaAthanQuran */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "ShiaAthanQuran" */;
+				buildPhases = (
+					08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
+					66B37EF9BA24B0C915BEE41B /* [Expo] Configure project */,
+					13B07F871A680F5B00A75B9A /* Sources */,
+					13B07F8C1A680F5B00A75B9A /* Frameworks */,
+					13B07F8E1A680F5B00A75B9A /* Resources */,
+					A70000000000000000000030 /* Embed App Extensions */,
+					06E9240DD15A41C69F888DB9 /* Embed Watch Content */,
+					00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
+					800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
+					E21E3161CFD60156FCD39621 /* [CP] Embed Pods Frameworks */,
+				);
+			buildRules = (
+			);
+				dependencies = (
+					A70000000000000000000061 /* PBXTargetDependency */,
+					D272AF72DBF64567BBED807B /* PBXTargetDependency */,
+				);
+			name = ShiaAthanQuran;
+			productName = ShiaAthanQuran;
+			productReference = 13B07F961A680F5B00A75B9A /* ShiaAthanQuran.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A70000000000000000000050 /* AthanWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A70000000000000000000051 /* Build configuration list for PBXNativeTarget "AthanWidgetExtension" */;
 			buildPhases = (
-				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				66B37EF9BA24B0C915BEE41B /* [Expo] Configure project */,
-				13B07F871A680F5B00A75B9A /* Sources */,
-				13B07F8C1A680F5B00A75B9A /* Frameworks */,
-				13B07F8E1A680F5B00A75B9A /* Resources */,
-				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
-				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				E21E3161CFD60156FCD39621 /* [CP] Embed Pods Frameworks */,
+				A70000000000000000000031 /* Sources */,
+				A70000000000000000000032 /* Frameworks */,
+				A70000000000000000000033 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = ShiaAthanQuran;
-			productName = ShiaAthanQuran;
-			productReference = 13B07F961A680F5B00A75B9A /* ShiaAthanQuran.app */;
-			productType = "com.apple.product-type.application";
+			name = AthanWidgetExtension;
+			productName = AthanWidgetExtension;
+			productReference = A70000000000000000000010 /* AthanWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		DD1AC6C78AD043DD8AE76588 /* "AthanWatchApp" */ = {
+			isa = PBXNativeTarget;
+			name = "AthanWatchApp";
+			productName = "AthanWatchApp";
+			productReference = 60B1800A574C48A3B5F9F044;
+			productType = "com.apple.product-type.application.watchapp2";
+			buildConfigurationList = C3177F55398946E5A0CA4F4A;
+			buildPhases = (
+				6574759DF899453FA70B97EA /* Embed App Extensions */,
+				C4FBFEED0FD84166A7CAE7E3 /* Sources */,
+				1DA00C6669CF4D20AD9F4A77 /* Frameworks */,
+				24D2CC7AD6BD4C13B6DAC36E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A5377C15723A46B7964CD0D2 /* PBXTargetDependency */,
+			);
+		};
+		7AD503C24F0D42419F68A22E /* "AthanWatchExtension" */ = {
+			isa = PBXNativeTarget;
+			name = "AthanWatchExtension";
+			productName = "AthanWatchExtension";
+			productReference = C2179A2852484F8E8B81712A;
+			productType = "com.apple.product-type.watchkit2-extension";
+			buildConfigurationList = F0437620DB05485688BDA395;
+			buildPhases = (
+				EE86DE9654DF4B579D4BD564 /* Sources */,
+				3452702E2B76454E95EE1864 /* Frameworks */,
+				B9916985FD214539A05FBFE5 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
 		};
 /* End PBXNativeTarget section */
 
@@ -172,6 +373,15 @@
 				LastUpgradeCheck = 1130;
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
+						LastSwiftMigration = 1250;
+					};
+					A70000000000000000000050 = {
+						LastSwiftMigration = 1250;
+					};
+					DD1AC6C78AD043DD8AE76588 = {
+						LastSwiftMigration = 1250;
+					};
+					7AD503C24F0D42419F68A22E = {
 						LastSwiftMigration = 1250;
 					};
 				};
@@ -190,6 +400,9 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* ShiaAthanQuran */,
+				A70000000000000000000050 /* AthanWidgetExtension */,
+				DD1AC6C78AD043DD8AE76588 /* "AthanWatchApp" */,
+				7AD503C24F0D42419F68A22E /* "AthanWatchExtension" */,
 			);
 		};
 /* End PBXProject section */
@@ -203,6 +416,28 @@
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
 				953F7B4E0EFD68704149D32C /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A70000000000000000000033 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		24D2CC7AD6BD4C13B6DAC36E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B9916985FD214539A05FBFE5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				11748EFA1627418A92DF81A0 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -338,13 +573,57 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
+				A70000000000000000000021 /* AthanWidgetBridge.swift in Sources */,
+				A70000000000000000000022 /* AthanWidgetBridge.m in Sources */,
 				7248B2D98EAACEC9C4F09163 /* ExpoModulesProvider.swift in Sources */,
 				A1B2C3D4E5F60718293A4B5C /* ExpoUIColorPicker.m in Sources */,
 				C1D2E3F4A5B60718293A4B5C /* CityMenuButton.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A70000000000000000000031 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A70000000000000000000020 /* AthanWidgetBundle.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C4FBFEED0FD84166A7CAE7E3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EE86DE9654DF4B579D4BD564 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2A3EC6BC263D4B81B421F907 /* AthanWatchApp.swift in Sources */,
+				8D65BCBA4D3E40CFA880CF1A /* AthanWatchConnectivity.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A70000000000000000000061 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A70000000000000000000050 /* AthanWidgetExtension */;
+			targetProxy = A70000000000000000000060 /* PBXContainerItemProxy */;
+		};
+		D272AF72DBF64567BBED807B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DD1AC6C78AD043DD8AE76588 /* "AthanWatchApp" */;
+			targetProxy = C2EC035A9F3F4DF5BBDA5377 /* PBXContainerItemProxy */;
+		};
+		A5377C15723A46B7964CD0D2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7AD503C24F0D42419F68A22E /* "AthanWatchExtension" */;
+			targetProxy = 918EE605EEE44808B9137805 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
@@ -410,6 +689,53 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		A70000000000000000000052 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = AthanWidgetExtension/AthanWidgetExtension.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AthanWidgetExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.shia-athan-quran.AthanWidgetExtension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A70000000000000000000053 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = AthanWidgetExtension/AthanWidgetExtension.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AthanWidgetExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.shia-athan-quran.AthanWidgetExtension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -535,6 +861,97 @@
 			};
 			name = Release;
 		};
+		80E745407C864431A9678202 /* Debug */ = {
+			name = Debug;
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				INFOPLIST_FILE = AthanWatchApp/Info.plist;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.shia-athan-quran.watchkitapp";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+		};
+		8D17428054CC451C85135E39 /* Release */ = {
+			name = Release;
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AthanWatchApp/Info.plist;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.shia-athan-quran.watchkitapp";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+		};
+		77A9D28036BB4AF783239F3D /* Debug */ = {
+			name = Debug;
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = AthanWatchExtension/AthanWatchExtension.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				INFOPLIST_FILE = AthanWatchExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.shia-athan-quran.watchkitapp.watchkitextension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+		};
+		F7EF938C17164C469364902F /* Release */ = {
+			name = Release;
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = AthanWatchExtension/AthanWatchExtension.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AthanWatchExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.shia-athan-quran.watchkitapp.watchkitextension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -547,11 +964,38 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		A70000000000000000000051 /* Build configuration list for PBXNativeTarget "AthanWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A70000000000000000000052 /* Debug */,
+				A70000000000000000000053 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "ShiaAthanQuran" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,
 				83CBBA211A601CBA00E9B192 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C3177F55398946E5A0CA4F4A /* Build configuration list for PBXNativeTarget "AthanWatchApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				80E745407C864431A9678202 /* Debug */,
+				8D17428054CC451C85135E39 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F0437620DB05485688BDA395 /* Build configuration list for PBXNativeTarget "AthanWatchExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				77A9D28036BB4AF783239F3D /* Debug */,
+				F7EF938C17164C469364902F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

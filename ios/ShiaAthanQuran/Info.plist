@@ -56,6 +56,8 @@
 	</array>
 	<key>NSUserNotificationUsageDescription</key>
 	<string>Notifications are used for Athan reminders at prayer times.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIBackgroundModes</key>
